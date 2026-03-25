@@ -6,11 +6,11 @@
 
 :root {
   font-family: 'Manrope', sans-serif;
-  color: #e2e8f0;
+  color: #1e293b;
   background:
-    radial-gradient(circle at 15% 0%, rgba(59, 130, 246, 0.15) 0%, rgba(2, 6, 23, 0.2) 34%),
-    radial-gradient(circle at 95% 10%, rgba(148, 163, 184, 0.12) 0%, rgba(2, 6, 23, 0.2) 30%),
-    #020617;
+    radial-gradient(circle at 15% 0%, rgba(148, 163, 184, 0.2) 0%, rgba(241, 245, 249, 0.6) 34%),
+    radial-gradient(circle at 95% 10%, rgba(203, 213, 225, 0.25) 0%, rgba(248, 250, 252, 0.6) 30%),
+    #f8fafc;
 }
 
 * {

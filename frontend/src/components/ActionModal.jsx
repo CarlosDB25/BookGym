@@ -3,11 +3,11 @@ export function ActionModal({ open, type = 'info', title, lines = [], onClose })
 
   const tone =
     type === 'error'
-      ? 'border-rose-400/40 bg-rose-950/90 text-rose-100'
-      : 'border-blue-300/40 bg-slate-900/95 text-slate-100';
+      ? 'border-rose-300 bg-white text-rose-800'
+      : 'border-slate-300 bg-white text-slate-800';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/35 p-4">
       <article className={`w-full max-w-md rounded-2xl border p-5 shadow-2xl card-rise ${tone}`}>
         <h3 className="text-lg font-bold">{title}</h3>
 
@@ -19,7 +19,7 @@ export function ActionModal({ open, type = 'info', title, lines = [], onClose })
 
         <button
           onClick={onClose}
-          className="mt-5 w-full rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-white"
+          className="mt-5 w-full rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
         >
           Entendido
         </button>

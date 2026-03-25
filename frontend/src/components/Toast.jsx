@@ -3,8 +3,8 @@ export function Toast({ notice, onClose }) {
 
   const styles =
     notice.type === 'error'
-      ? 'border-rose-500/40 bg-rose-900/80 text-rose-100'
-      : 'border-emerald-500/40 bg-emerald-900/80 text-emerald-100';
+      ? 'border-rose-300 bg-rose-50 text-rose-800'
+      : 'border-emerald-300 bg-emerald-50 text-emerald-800';
 
   return (
     <div className={`fixed right-4 top-4 z-50 max-w-sm rounded-2xl border px-4 py-3 shadow-xl transition-all duration-300 toast-in ${styles}`}>
