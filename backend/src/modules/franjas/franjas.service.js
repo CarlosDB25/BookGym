@@ -1,5 +1,12 @@
 const prisma = require('../../shared/prisma/client');
 
+function inicioFranjaBogota(fechaDate, horaInicio) {
+  const y = fechaDate.getUTCFullYear();
+  const m = String(fechaDate.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(fechaDate.getUTCDate()).padStart(2, '0');
+  return new Date(`${y}-${m}-${d}T${horaInicio}:00-05:00`);
+}
+
 function nivelSaturacion(cuposDisponibles, capacidadMaxima) {
   const ocupacion = 1 - cuposDisponibles / capacidadMaxima;
 
@@ -26,7 +33,10 @@ async function obtenerDisponibilidadSemana(fechaInicio) {
     orderBy: [{ fecha: 'asc' }, { plantilla: { horaInicio: 'asc' } }],
   });
 
-  return franjas.map((f) => ({
+  const ahora = new Date();
+  const franjasVigentes = franjas.filter((f) => inicioFranjaBogota(f.fecha, f.plantilla.horaInicio) > ahora);
+
+  return franjasVigentes.map((f) => ({
     id: f.id,
     fecha: f.fecha,
     diaSemana: f.plantilla.diaSemana,
