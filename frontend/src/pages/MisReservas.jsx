@@ -1,16 +1,32 @@
 import { ReservaItem } from '../components/ReservaItem';
+import { ActionModal } from '../components/ActionModal';
 import { useCancelarReserva, useReservas } from '../hooks/useReservas';
+import { useState } from 'react';
 
 export function MisReservas({ onNotice }) {
   const { data: reservas = [], isLoading, error } = useReservas();
   const cancelar = useCancelarReserva();
+  const [modal, setModal] = useState({ open: false, type: 'info', title: '', lines: [] });
 
   async function onCancelar(idReserva) {
     try {
       const respuesta = await cancelar.mutateAsync(idReserva);
       onNotice?.('success', respuesta?.mensaje || 'Reserva cancelada exitosamente');
+      setModal({
+        open: true,
+        type: 'success',
+        title: 'Reserva cancelada',
+        lines: [respuesta?.mensaje || 'Se libero el cupo exitosamente.'],
+      });
     } catch (err) {
-      onNotice?.('error', err?.response?.data?.error || 'No fue posible cancelar la reserva');
+      const msg = err?.response?.data?.error || 'No fue posible cancelar la reserva';
+      onNotice?.('error', msg);
+      setModal({
+        open: true,
+        type: 'error',
+        title: 'Cancelacion no permitida',
+        lines: [msg],
+      });
     }
   }
 
@@ -24,6 +40,14 @@ export function MisReservas({ onNotice }) {
 
   return (
     <section className="fade-in">
+      <ActionModal
+        open={modal.open}
+        type={modal.type}
+        title={modal.title}
+        lines={modal.lines}
+        onClose={() => setModal((m) => ({ ...m, open: false }))}
+      />
+
       <h2 className="mb-4 text-2xl font-bold text-white">Mis reservas activas</h2>
 
       {reservas.length === 0 ? (

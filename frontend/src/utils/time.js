@@ -66,3 +66,40 @@ export function formatDateBogota(dateISO) {
     month: '2-digit',
   }).format(date);
 }
+
+export function weekdayIndexFromDiaSemana(diaSemana) {
+  const map = {
+    lunes: 0,
+    martes: 1,
+    miercoles: 2,
+    jueves: 3,
+    viernes: 4,
+    sabado: 5,
+    domingo: 6,
+  };
+
+  return map[diaSemana] ?? 0;
+}
+
+export function currentWeekdayIndexBogota() {
+  const names = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+  const name = new Intl.DateTimeFormat('es-CO', {
+    timeZone: TZ,
+    weekday: 'long',
+  })
+    .format(new Date())
+    .toLowerCase();
+
+  const weekday = names.find((n) => name.includes(n)) || 'lunes';
+  const map = {
+    lunes: 0,
+    martes: 1,
+    miercoles: 2,
+    jueves: 3,
+    viernes: 4,
+    sabado: 5,
+    domingo: 6,
+  };
+
+  return map[weekday];
+}

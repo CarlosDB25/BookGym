@@ -32,7 +32,7 @@ function App() {
       <header className="mb-6 rounded-3xl border border-slate-700 bg-slate-900/80 p-5 shadow-2xl backdrop-blur fade-in">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">Sistema de reservas</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-blue-200">Sistema de reservas</p>
             <h1 className="text-2xl font-extrabold text-white">BookGym - Prototipo Funcional</h1>
             <p className="text-sm text-slate-300">
               Usuario: <strong>{usuario.id}</strong> ({usuario.rol})
@@ -51,7 +51,7 @@ function App() {
           <button
             onClick={() => setTab('principal')}
             className={`rounded-xl px-4 py-2 text-sm font-semibold ${
-              tab === 'principal' ? 'bg-cyan-500 text-slate-900' : 'bg-slate-800 text-slate-200'
+              tab === 'principal' ? 'bg-blue-200 text-slate-900' : 'bg-slate-800 text-slate-200'
             }`}
           >
             {esAdmin ? 'Panel admin' : 'Agenda semanal'}
@@ -60,7 +60,7 @@ function App() {
             <button
               onClick={() => setTab('agenda')}
               className={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                tab === 'agenda' ? 'bg-cyan-500 text-slate-900' : 'bg-slate-800 text-slate-200'
+                tab === 'agenda' ? 'bg-blue-200 text-slate-900' : 'bg-slate-800 text-slate-200'
               }`}
             >
               Agenda (solo lectura)
@@ -69,7 +69,7 @@ function App() {
             <button
               onClick={() => setTab('mis-reservas')}
               className={`rounded-xl px-4 py-2 text-sm font-semibold ${
-                tab === 'mis-reservas' ? 'bg-cyan-500 text-slate-900' : 'bg-slate-800 text-slate-200'
+                tab === 'mis-reservas' ? 'bg-blue-200 text-slate-900' : 'bg-slate-800 text-slate-200'
               }`}
             >
               Mis reservas
