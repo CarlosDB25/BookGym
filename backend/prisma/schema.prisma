@@ -1,0 +1,126 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  idInstitucional       String       @id @map("id_institucional")
+  rol                   Rol
+  estado                Estado       @default(activo)
+  password              String
+  reservas              Reserva[]
+  suspensiones          Suspension[]
+  asistenciasRegistradas Asistencia[] @relation("RegistradoPor")
+  suspensionesLevantadas Suspension[] @relation("LevantadaPor")
+
+  @@map("usuario")
+}
+
+model PlantillaFranja {
+  id              String   @id @default(uuid())
+  diaSemana       DiaSemana
+  horaInicio      String
+  horaFin         String
+  capacidadMaxima Int
+  activa          Boolean  @default(true)
+  franjas         Franja[]
+
+  @@map("plantilla_franja")
+}
+
+model Franja {
+  id               String          @id @default(uuid())
+  idPlantilla      String
+  plantilla        PlantillaFranja @relation(fields: [idPlantilla], references: [id])
+  fecha            DateTime        @db.Date
+  semestre         String
+  cuposDisponibles Int
+  reservas         Reserva[]
+
+  @@map("franja")
+}
+
+model Reserva {
+  id            String        @id @default(uuid())
+  idUsuario     String
+  idFranja      String
+  fechaCreacion DateTime      @default(now())
+  estado        EstadoReserva @default(activa)
+  usuario       Usuario       @relation(fields: [idUsuario], references: [idInstitucional])
+  franja        Franja        @relation(fields: [idFranja], references: [id])
+  asistencia    Asistencia?
+
+  @@map("reserva")
+}
+
+model Asistencia {
+  id            String    @id @default(uuid())
+  idReserva     String    @unique
+  registradoPor String
+  resultado     Resultado
+  registradoEn  DateTime  @default(now())
+  reserva       Reserva   @relation(fields: [idReserva], references: [id])
+  admin         Usuario   @relation("RegistradoPor", fields: [registradoPor], references: [idInstitucional])
+
+  @@map("asistencia")
+}
+
+model Suspension {
+  id           String    @id @default(uuid())
+  idUsuario    String
+  levantadaPor String?
+  fechaInicio  DateTime
+  fechaFin     DateTime
+  motivo       String
+  activa       Boolean   @default(true)
+  usuario      Usuario   @relation(fields: [idUsuario], references: [idInstitucional])
+  admin        Usuario?  @relation("LevantadaPor", fields: [levantadaPor], references: [idInstitucional])
+
+  @@map("suspension")
+}
+
+model Configuracion {
+  clave       String @id
+  valor       String
+  descripcion String
+
+  @@map("configuracion")
+}
+
+enum Rol {
+  estudiante
+  administrador
+}
+
+enum Estado {
+  activo
+  suspendido
+}
+
+enum DiaSemana {
+  lunes
+  martes
+  miercoles
+  jueves
+  viernes
+}
+
+enum EstadoReserva {
+  activa
+  cancelada
+}
+
+enum Resultado {
+  presente
+  no_show
+}
