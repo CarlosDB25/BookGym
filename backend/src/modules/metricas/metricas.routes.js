@@ -11,7 +11,7 @@ router.use(verificarToken, soloAdmin);
  *     tags:
  *       - Metricas
  *     summary: Obtener resumen semanal de capacidad y ocupacion
- *     description: Endpoint exclusivo de administradores para monitorear ocupacion y saturacion semanal.
+ *     description: Endpoint exclusivo de administradores para monitorear ocupacion y saturacion semanal sobre franjas vigentes (excluye franjas pasadas y reservas canceladas).
  *     security:
  *       - bearerAuth: []
  *     parameters:

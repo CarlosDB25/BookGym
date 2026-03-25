@@ -26,6 +26,7 @@ export function AdminDashboard() {
       <h2 className="text-2xl font-bold text-slate-900">Panel administrativo semanal</h2>
       <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
         <span>Semana: {resumen?.semana || fecha}</span>
+        <span>Alcance: solo franjas vigentes (sin pasadas ni canceladas)</span>
         <span>Ultima actualizacion: {new Date(dataUpdatedAt).toLocaleTimeString('es-CO')}</span>
         <button
           onClick={() => refetch()}

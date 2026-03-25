@@ -8,6 +8,9 @@ export function useReservas() {
       const { data } = await api.get('/reservas');
       return data;
     },
+    refetchInterval: 7000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
   });
 }
 

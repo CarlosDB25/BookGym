@@ -9,6 +9,13 @@ function parseMonday(fecha) {
   return base;
 }
 
+function inicioFranjaBogota(fechaDate, horaInicio) {
+  const y = fechaDate.getUTCFullYear();
+  const m = String(fechaDate.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(fechaDate.getUTCDate()).padStart(2, '0');
+  return new Date(`${y}-${m}-${d}T${horaInicio}:00-05:00`);
+}
+
 async function resumen(fecha) {
   const inicio = parseMonday(fecha);
   const fin = new Date(inicio);
@@ -19,19 +26,32 @@ async function resumen(fecha) {
     include: { plantilla: true },
   });
 
-  const totalCapacidad = franjas.reduce((acc, f) => acc + f.plantilla.capacidadMaxima, 0);
-  const totalDisponibles = franjas.reduce((acc, f) => acc + f.cuposDisponibles, 0);
-  const totalReservadas = totalCapacidad - totalDisponibles;
+  const ahora = new Date();
+  const franjasVigentes = franjas.filter((f) => inicioFranjaBogota(f.fecha, f.plantilla.horaInicio) > ahora);
+  const idsFranjasVigentes = franjasVigentes.map((f) => f.id);
 
-  const saturacionAlta = franjas.filter((f) => {
+  const totalReservadas =
+    idsFranjasVigentes.length > 0
+      ? await prisma.reserva.count({
+          where: {
+            estado: 'activa',
+            idFranja: { in: idsFranjasVigentes },
+          },
+        })
+      : 0;
+
+  const totalCapacidad = franjasVigentes.reduce((acc, f) => acc + f.plantilla.capacidadMaxima, 0);
+  const totalDisponibles = franjasVigentes.reduce((acc, f) => acc + f.cuposDisponibles, 0);
+
+  const saturacionAlta = franjasVigentes.filter((f) => {
     const ocupacion = 1 - f.cuposDisponibles / f.plantilla.capacidadMaxima;
     return ocupacion >= 0.75;
   }).length;
-  const saturacionMedia = franjas.filter((f) => {
+  const saturacionMedia = franjasVigentes.filter((f) => {
     const ocupacion = 1 - f.cuposDisponibles / f.plantilla.capacidadMaxima;
     return ocupacion >= 0.4 && ocupacion < 0.75;
   }).length;
-  const saturacionBaja = franjas.length - saturacionAlta - saturacionMedia;
+  const saturacionBaja = franjasVigentes.length - saturacionAlta - saturacionMedia;
 
   return {
     semana: inicio.toISOString().slice(0, 10),
@@ -42,7 +62,7 @@ async function resumen(fecha) {
     saturacionAlta,
     saturacionMedia,
     saturacionBaja,
-    totalFranjas: franjas.length,
+    totalFranjas: franjasVigentes.length,
   };
 }
 

@@ -10,6 +10,9 @@ export function useFranjas(fechaLunes, enabled = true, options = {}) {
     },
     enabled: Boolean(fechaLunes) && enabled,
     staleTime: 30 * 1000,
+    refetchInterval: 7000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
     ...options,
   });
 }
