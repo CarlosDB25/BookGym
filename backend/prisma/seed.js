@@ -4,6 +4,12 @@ const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
 async function main() {
+  const usuariosExistentes = await prisma.usuario.count();
+  if (usuariosExistentes > 0) {
+    console.log('Seed omitido: la base ya contiene datos iniciales.');
+    return;
+  }
+
   const passwordHash = await bcrypt.hash('password123', 10);
 
   await prisma.usuario.createMany({
