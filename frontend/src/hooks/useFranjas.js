@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/client';
 
-export function useFranjas(fechaLunes, enabled = true) {
+export function useFranjas(fechaLunes, enabled = true, options = {}) {
   return useQuery({
     queryKey: ['franjas-semana', fechaLunes],
     queryFn: async () => {
@@ -10,5 +10,6 @@ export function useFranjas(fechaLunes, enabled = true) {
     },
     enabled: Boolean(fechaLunes) && enabled,
     staleTime: 30 * 1000,
+    ...options,
   });
 }

@@ -6,6 +6,7 @@ const authRoutes = require('./modules/auth/auth.routes');
 const franjasRoutes = require('./modules/franjas/franjas.routes');
 const reservasRoutes = require('./modules/reservas/reservas.routes');
 const metricasRoutes = require('./modules/metricas/metricas.routes');
+const { setupSwagger } = require('./docs/swagger');
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/franjas', franjasRoutes);
 app.use('/api/reservas', reservasRoutes);
 app.use('/api/metricas', metricasRoutes);
+setupSwagger(app);
 
 app.use((err, req, res, next) => {
   console.error(err);

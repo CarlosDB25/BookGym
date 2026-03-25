@@ -1,16 +1,42 @@
-# React + Vite
+# Frontend BookGym
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Cliente web del prototipo de reservas.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- React + Vite
+- Axios
+- TanStack Query
+- Tailwind CSS
 
-## React Compiler
+## Variables
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Crear .env basado en .env.example:
 
-## Expanding the ESLint configuration
+- VITE_API_URL=https://bookgym-production.up.railway.app/api
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Scripts
+
+- npm run dev
+- npm run build
+- npm run preview
+
+## Flujo estudiante
+
+- Login
+- Agenda semanal unificada por bloques (L-V)
+- Seleccion de bloque
+- Confirmacion intermedia en modal
+- Reserva y cancelacion con respuesta visual
+
+## Flujo administrador
+
+- Panel de metricas semanales
+- Refresco manual y automatico de datos
+- Vista de agenda en modo solo lectura
+
+## UX funcional
+
+- Zona horaria Colombia (America/Bogota)
+- Bloques horarios con estados visibles: disponible, sin cupos, reservado, limite alcanzado
+- Modal de confirmacion antes de reservar

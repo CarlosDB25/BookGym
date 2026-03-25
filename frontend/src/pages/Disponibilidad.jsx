@@ -8,23 +8,10 @@ import { getBogotaNowMillis, getBogotaTodayYMD, mondayFromYMD, slotMillisBogota 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
 const LIMITE_RESERVAS = 2;
 
-function agruparPorDia(franjas) {
-  const out = { lunes: [], martes: [], miercoles: [], jueves: [], viernes: [] };
-
-  for (const franja of franjas) {
-    if (out[franja.diaSemana]) out[franja.diaSemana].push(franja);
-  }
-
-  for (const dia of DIAS) {
-    out[dia].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
-  }
-
-  return out;
-}
-
 export function Disponibilidad({ soloLectura = false, onNotice }) {
   const lunes = useMemo(() => mondayFromYMD(getBogotaTodayYMD()), []);
-  const [modal, setModal] = useState({ open: false, type: 'info', title: '', lines: [] });
+  const [modal, setModal] = useState({ open: false, type: 'info', title: '', lines: [], confirm: null });
+  const [pendiente, setPendiente] = useState(null);
 
   const { data: franjas = [], isLoading, error } = useFranjas(lunes, true);
   const { data: reservas = [] } = useReservas();
@@ -38,22 +25,51 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
     [franjas, nowMillis]
   );
 
-  const dias = useMemo(() => agruparPorDia(franjasVigentes), [franjasVigentes]);
+  const horas = useMemo(() => {
+    const hs = [...new Set(franjasVigentes.map((f) => f.horaInicio))];
+    hs.sort((a, b) => a.localeCompare(b));
+    return hs;
+  }, [franjasVigentes]);
 
-  async function onReservar(franja) {
+  const mapa = useMemo(() => {
+    const m = new Map();
+    for (const franja of franjasVigentes) {
+      m.set(`${franja.diaSemana}|${franja.horaInicio}`, franja);
+    }
+    return m;
+  }, [franjasVigentes]);
+
+  function pedirConfirmacion(franja) {
+    setPendiente(franja);
+    setModal({
+      open: true,
+      type: 'info',
+      title: 'Confirmar reserva',
+      lines: [
+        `Dia: ${franja.diaSemana}`,
+        `Horario: ${franja.horaInicio} - ${franja.horaFin}`,
+        `Cupos disponibles: ${franja.cuposDisponibles}`,
+      ],
+      confirm: 'reservar',
+    });
+  }
+
+  async function confirmarReserva() {
+    if (!pendiente) return;
+
     try {
-      const reserva = await crearReserva.mutateAsync(franja.id);
+      await crearReserva.mutateAsync(pendiente.id);
       onNotice?.('success', 'Reserva registrada y cupo actualizado en tiempo real.');
       setModal({
         open: true,
         type: 'success',
         title: 'Reserva exitosa',
         lines: [
-          `Reserva: ${reserva.id}`,
-          `${franja.diaSemana} ${franja.horaInicio}-${franja.horaFin}`,
+          `${pendiente.diaSemana} ${pendiente.horaInicio}-${pendiente.horaFin}`,
           `Estado: activa`,
           `Reservas activas: ${Math.min(reservas.length + 1, LIMITE_RESERVAS)}/${LIMITE_RESERVAS}`,
         ],
+        confirm: null,
       });
     } catch (err) {
       const msg = err?.response?.data?.error || 'No fue posible crear la reserva';
@@ -63,7 +79,10 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
         type: 'error',
         title: 'Reserva rechazada',
         lines: [msg, 'El servidor valido restricciones y no permitio la operacion.'],
+        confirm: null,
       });
+    } finally {
+      setPendiente(null);
     }
   }
 
@@ -82,7 +101,10 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
         type={modal.type}
         title={modal.title}
         lines={modal.lines}
-        onClose={() => setModal((m) => ({ ...m, open: false }))}
+        onClose={() => setModal((m) => ({ ...m, open: false, confirm: null }))}
+        onConfirm={modal.confirm === 'reservar' ? confirmarReserva : undefined}
+        confirmLabel="Confirmar"
+        cancelLabel="Volver"
       />
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -92,61 +114,74 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Reservas activas: {reservas.length}/{LIMITE_RESERVAS}</span>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Zona horaria: Colombia (UTC-5)</span>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Cupos sincronizados por servidor</span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Selecciona bloque y confirma</span>
         </div>
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="grid min-w-[1050px] grid-cols-5 gap-3">
+        <div className="grid min-w-[1100px] grid-cols-6 gap-2">
+          <div className="rounded-lg bg-slate-100 p-2 text-center text-xs font-bold uppercase tracking-wide text-slate-700">Hora</div>
           {DIAS.map((dia) => (
-            <section key={dia} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <h3 className="mb-3 border-b border-slate-200 pb-2 text-sm font-bold uppercase tracking-wide text-slate-700">{dia}</h3>
+            <div key={dia} className="rounded-lg bg-slate-100 p-2 text-center text-xs font-bold uppercase tracking-wide text-slate-700">
+              {dia}
+            </div>
+          ))}
 
-              <div className="max-h-[64vh] space-y-2 overflow-auto pr-1">
-                {(dias[dia] || []).length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-slate-300 bg-white p-3 text-xs text-slate-500">
-                    Sin franjas futuras
-                  </div>
-                ) : (
-                  (dias[dia] || []).map((f) => {
-                    const yaReservada = idsReservados.has(f.id);
-                    const sinCupo = f.cuposDisponibles <= 0;
-                    const limiteAlcanzado = reservas.length >= LIMITE_RESERVAS;
+          {horas.length === 0 ? (
+            <div className="col-span-6 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-center text-sm text-slate-500">
+              No hay franjas futuras para mostrar en esta semana.
+            </div>
+          ) : null}
 
-                    return (
-                      <article key={f.id} className="rounded-lg border border-slate-200 bg-white p-2 transition hover:border-slate-400">
-                        <div className="flex items-center justify-between gap-1">
-                          <p className="text-xs font-semibold text-slate-800">{f.horaInicio} - {f.horaFin}</p>
-                          <SaturacionBadge nivel={f.saturacion} />
-                        </div>
-
-                        <p className="mt-1 text-[11px] text-slate-600">Cupos: {f.cuposDisponibles}/{f.capacidadMaxima}</p>
-
-                        {soloLectura ? (
-                          <p className="mt-2 rounded bg-slate-100 px-2 py-1 text-center text-[11px] text-slate-600">Solo lectura</p>
-                        ) : (
-                          <button
-                            onClick={() => onReservar(f)}
-                            disabled={crearReserva.isPending || yaReservada || sinCupo || limiteAlcanzado}
-                            className="mt-2 w-full rounded bg-slate-800 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
-                          >
-                            {yaReservada
-                              ? 'Ya reservada'
-                              : sinCupo
-                              ? 'Sin cupos'
-                              : limiteAlcanzado
-                              ? 'Limite alcanzado'
-                              : crearReserva.isPending
-                              ? 'Procesando...'
-                              : 'Reservar'}
-                          </button>
-                        )}
-                      </article>
-                    );
-                  })
-                )}
+          {horas.map((hora) => (
+            <div key={`row-${hora}`} className="contents">
+              <div key={`h-${hora}`} className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs font-semibold text-slate-700">
+                {hora}
               </div>
-            </section>
+              {DIAS.map((dia) => {
+                const f = mapa.get(`${dia}|${hora}`);
+                if (!f) {
+                  return (
+                    <div key={`${dia}-${hora}`} className="rounded-lg border border-slate-100 bg-slate-50 p-2 text-center text-[11px] text-slate-400">
+                      -
+                    </div>
+                  );
+                }
+
+                const yaReservada = idsReservados.has(f.id);
+                const sinCupo = f.cuposDisponibles <= 0;
+                const limiteAlcanzado = reservas.length >= LIMITE_RESERVAS;
+
+                let bloque = 'bg-white border-slate-300 hover:border-slate-500';
+                if (sinCupo) bloque = 'bg-slate-100 border-slate-300';
+                if (yaReservada) bloque = 'bg-emerald-50 border-emerald-300';
+
+                return (
+                  <button
+                    key={f.id}
+                    onClick={() => (soloLectura ? null : pedirConfirmacion(f))}
+                    disabled={soloLectura || crearReserva.isPending || sinCupo || yaReservada || limiteAlcanzado}
+                    className={`rounded-lg border p-2 text-left text-[11px] transition ${bloque} disabled:cursor-not-allowed disabled:opacity-70`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-700">{f.cuposDisponibles}/{f.capacidadMaxima}</span>
+                      <SaturacionBadge nivel={f.saturacion} />
+                    </div>
+                    <p className="mt-1 text-slate-500">
+                      {soloLectura
+                        ? 'No disponible para reserva'
+                        : yaReservada
+                        ? 'Ya reservada'
+                        : sinCupo
+                        ? 'Sin cupos'
+                        : limiteAlcanzado
+                        ? 'Limite alcanzado'
+                        : 'Tocar para reservar'}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
           ))}
         </div>
       </div>
