@@ -1,5 +1,24 @@
 const prisma = require('../../shared/prisma/client');
 
+const CONFIG_DEFAULTS = {
+  limite_reservas_activas: {
+    valor: 2,
+    descripcion: 'Max reservas activas simultaneas por usuario',
+  },
+  max_reservas_por_dia: {
+    valor: 1,
+    descripcion: 'Max reservas activas por usuario en un mismo dia',
+  },
+  anticipacion_reserva_min: {
+    valor: 30,
+    descripcion: 'Minutos minimos de anticipacion para crear reserva',
+  },
+  anticipacion_cancelacion_min: {
+    valor: 15,
+    descripcion: 'Minutos minimos de anticipacion para cancelar reserva',
+  },
+};
+
 function inicioFranjaBogota(fechaDate, horaInicio) {
   const y = fechaDate.getUTCFullYear();
   const m = String(fechaDate.getUTCMonth() + 1).padStart(2, '0');
@@ -7,8 +26,23 @@ function inicioFranjaBogota(fechaDate, horaInicio) {
   return new Date(`${y}-${m}-${d}T${horaInicio}:00-05:00`);
 }
 
+function esFranjaVigente(franja) {
+  return inicioFranjaBogota(franja.fecha, franja.plantilla.horaInicio) > new Date();
+}
+
 async function leerConfig(clave) {
-  const config = await prisma.configuracion.findUnique({ where: { clave } });
+  let config = await prisma.configuracion.findUnique({ where: { clave } });
+
+  if (!config && CONFIG_DEFAULTS[clave]) {
+    const def = CONFIG_DEFAULTS[clave];
+    config = await prisma.configuracion.create({
+      data: {
+        clave,
+        valor: String(def.valor),
+        descripcion: def.descripcion,
+      },
+    });
+  }
 
   if (!config) {
     throw new Error(`Configuracion '${clave}' no encontrada`);
@@ -18,6 +52,27 @@ async function leerConfig(clave) {
 }
 
 async function crearReserva(idUsuario, idFranja) {
+  const minutosAnticipacionReserva = await leerConfig('anticipacion_reserva_min');
+
+  const franjaObjetivo = await prisma.franja.findUnique({
+    where: { id: idFranja },
+    include: { plantilla: true },
+  });
+
+  if (!franjaObjetivo) {
+    throw new Error('Franja no encontrada');
+  }
+
+  const ahora = new Date();
+  const inicioTurno = inicioFranjaBogota(franjaObjetivo.fecha, franjaObjetivo.plantilla.horaInicio);
+  const limiteReserva = new Date(inicioTurno.getTime() - minutosAnticipacionReserva * 60 * 1000);
+
+  if (ahora >= limiteReserva) {
+    throw new Error(
+      `La reserva solo esta permitida hasta ${minutosAnticipacionReserva} minutos antes del inicio del turno`
+    );
+  }
+
   const suspension = await prisma.suspension.findFirst({
     where: {
       idUsuario,
@@ -31,6 +86,7 @@ async function crearReserva(idUsuario, idFranja) {
   }
 
   const limite = await leerConfig('limite_reservas_activas');
+  const maxReservasPorDia = await leerConfig('max_reservas_por_dia');
   const activas = await prisma.reserva.count({
     where: {
       idUsuario,
@@ -40,6 +96,36 @@ async function crearReserva(idUsuario, idFranja) {
 
   if (activas >= limite) {
     throw new Error(`Limite de ${limite} reservas activas alcanzado`);
+  }
+
+  const reservaMismoDia = await prisma.reserva.findFirst({
+    where: {
+      idUsuario,
+      estado: 'activa',
+      franja: {
+        fecha: franjaObjetivo.fecha,
+      },
+    },
+  });
+
+  if (reservaMismoDia && maxReservasPorDia <= 1) {
+    throw new Error('Solo puedes tener una reserva activa por dia');
+  }
+
+  if (maxReservasPorDia > 1) {
+    const reservasMismoDia = await prisma.reserva.count({
+      where: {
+        idUsuario,
+        estado: 'activa',
+        franja: {
+          fecha: franjaObjetivo.fecha,
+        },
+      },
+    });
+
+    if (reservasMismoDia >= maxReservasPorDia) {
+      throw new Error(`Solo puedes tener ${maxReservasPorDia} reservas activas por dia`);
+    }
   }
 
   const yaReservada = await prisma.reserva.findFirst({
@@ -55,10 +141,22 @@ async function crearReserva(idUsuario, idFranja) {
   }
 
   return prisma.$transaction(async (tx) => {
-    const franja = await tx.franja.findUnique({ where: { id: idFranja } });
+    const franja = await tx.franja.findUnique({
+      where: { id: idFranja },
+      include: { plantilla: true },
+    });
 
     if (!franja) {
       throw new Error('Franja no encontrada');
+    }
+
+    const ahoraTx = new Date();
+    const inicioTurnoTx = inicioFranjaBogota(franja.fecha, franja.plantilla.horaInicio);
+    const limiteReservaTx = new Date(inicioTurnoTx.getTime() - minutosAnticipacionReserva * 60 * 1000);
+    if (ahoraTx >= limiteReservaTx) {
+      throw new Error(
+        `La reserva solo esta permitida hasta ${minutosAnticipacionReserva} minutos antes del inicio del turno`
+      );
     }
 
     if (franja.cuposDisponibles <= 0) {
@@ -78,6 +176,8 @@ async function crearReserva(idUsuario, idFranja) {
 }
 
 async function cancelarReserva(idReserva, idUsuario) {
+  const minutosAnticipacionCancelacion = await leerConfig('anticipacion_cancelacion_min');
+
   const reserva = await prisma.reserva.findUnique({
     where: { id: idReserva },
     include: { franja: { include: { plantilla: true } } },
@@ -97,10 +197,12 @@ async function cancelarReserva(idReserva, idUsuario) {
 
   const ahora = new Date();
   const inicioTurno = inicioFranjaBogota(reserva.franja.fecha, reserva.franja.plantilla.horaInicio);
-  const limiteCancelacion = new Date(inicioTurno.getTime() - 60 * 60 * 1000);
+  const limiteCancelacion = new Date(inicioTurno.getTime() - minutosAnticipacionCancelacion * 60 * 1000);
 
   if (ahora >= limiteCancelacion) {
-    throw new Error('La cancelacion solo esta permitida hasta 1 hora antes del inicio del turno');
+    throw new Error(
+      `La cancelacion solo esta permitida hasta ${minutosAnticipacionCancelacion} minutos antes del inicio del turno`
+    );
   }
 
   return prisma.$transaction(async (tx) => {
@@ -119,15 +221,28 @@ async function cancelarReserva(idReserva, idUsuario) {
 }
 
 async function obtenerReservasActivas(idUsuario) {
-  return prisma.reserva.findMany({
+  const activas = await prisma.reserva.findMany({
     where: { idUsuario, estado: 'activa' },
     include: { franja: { include: { plantilla: true } } },
-    orderBy: { fechaCreacion: 'desc' },
+    orderBy: [{ franja: { fecha: 'asc' } }, { fechaCreacion: 'desc' }],
   });
+
+  return activas.filter((r) => esFranjaVigente(r.franja));
+}
+
+async function obtenerHistorialReservas(idUsuario) {
+  const reservas = await prisma.reserva.findMany({
+    where: { idUsuario },
+    include: { franja: { include: { plantilla: true } } },
+    orderBy: [{ franja: { fecha: 'desc' } }, { fechaCreacion: 'desc' }],
+  });
+
+  return reservas.filter((r) => r.estado === 'cancelada' || !esFranjaVigente(r.franja));
 }
 
 module.exports = {
   crearReserva,
   cancelarReserva,
   obtenerReservasActivas,
+  obtenerHistorialReservas,
 };

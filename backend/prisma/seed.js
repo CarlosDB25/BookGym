@@ -27,6 +27,21 @@ async function main() {
         descripcion: 'Max reservas activas simultaneas por usuario',
       },
       {
+        clave: 'max_reservas_por_dia',
+        valor: '1',
+        descripcion: 'Max reservas activas por usuario en un mismo dia',
+      },
+      {
+        clave: 'anticipacion_reserva_min',
+        valor: '30',
+        descripcion: 'Minutos minimos de anticipacion para crear reserva',
+      },
+      {
+        clave: 'anticipacion_cancelacion_min',
+        valor: '15',
+        descripcion: 'Minutos minimos de anticipacion para cancelar reserva',
+      },
+      {
         clave: 'umbral_noshow',
         valor: '3',
         descripcion: 'Inasistencias acumuladas que activan suspension',

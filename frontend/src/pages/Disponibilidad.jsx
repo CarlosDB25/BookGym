@@ -3,10 +3,10 @@ import { SaturacionBadge } from '../components/SaturacionBadge';
 import { ActionModal } from '../components/ActionModal';
 import { useCrearReserva, useReservas } from '../hooks/useReservas';
 import { useFranjas } from '../hooks/useFranjas';
+import { useReglasReserva } from '../hooks/useReglasReserva';
 import { getBogotaNowMillis, getBogotaTodayYMD, mondayFromYMD, slotMillisBogota } from '../utils/time';
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
-const LIMITE_RESERVAS = 2;
 
 export function Disponibilidad({ soloLectura = false, onNotice }) {
   const lunes = useMemo(() => mondayFromYMD(getBogotaTodayYMD()), []);
@@ -15,15 +15,34 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
 
   const { data: franjas = [], isLoading, error } = useFranjas(lunes, true);
   const { data: reservas = [] } = useReservas();
+  const { data: reglas, isLoading: isLoadingReglas, error: errorReglas } = useReglasReserva();
   const crearReserva = useCrearReserva();
 
+  const limiteReservasActivas = reglas?.limiteReservasActivas;
+  const anticipacionReservaMin = reglas?.anticipacionReservaMin;
+  const anticipacionCancelacionMin = reglas?.anticipacionCancelacionMin;
+  const maxReservasPorDia = reglas?.maxReservasPorDia;
+
   const idsReservados = new Set(reservas.map((r) => r.idFranja));
+  const reservasPorFecha = useMemo(() => {
+    const map = new Map();
+    for (const r of reservas) {
+      const ymd = String(r.franja?.fecha || '').split('T')[0];
+      if (!ymd) continue;
+      map.set(ymd, (map.get(ymd) || 0) + 1);
+    }
+    return map;
+  }, [reservas]);
   const nowMillis = getBogotaNowMillis();
 
-  const franjasVigentes = useMemo(
-    () => franjas.filter((f) => slotMillisBogota(f.fecha, f.horaInicio) > nowMillis),
-    [franjas, nowMillis]
-  );
+  const msAnticipacionReserva = (anticipacionReservaMin || 0) * 60 * 1000;
+
+  const franjasVigentes = useMemo(() => {
+    return franjas.filter((f) => {
+      const inicio = slotMillisBogota(f.fecha, f.horaInicio);
+      return nowMillis < inicio - msAnticipacionReserva;
+    });
+  }, [franjas, nowMillis, msAnticipacionReserva]);
 
   const horas = useMemo(() => {
     const hs = [...new Set(franjasVigentes.map((f) => f.horaInicio))];
@@ -49,6 +68,10 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
         `Dia: ${franja.diaSemana}`,
         `Horario: ${franja.horaInicio} - ${franja.horaFin}`,
         `Cupos disponibles: ${franja.cuposDisponibles}`,
+        'Condiciones:',
+        `- Maximo ${maxReservasPorDia} reserva(s) activa(s) por dia.`,
+        `- Reserva permitida hasta ${anticipacionReservaMin} minutos antes del inicio.`,
+        `- Cancelacion permitida hasta ${anticipacionCancelacionMin} minutos antes del inicio.`,
       ],
       confirm: 'reservar',
     });
@@ -67,7 +90,7 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
         lines: [
           `${pendiente.diaSemana} ${pendiente.horaInicio}-${pendiente.horaFin}`,
           `Estado: activa`,
-          `Reservas activas: ${Math.min(reservas.length + 1, LIMITE_RESERVAS)}/${LIMITE_RESERVAS}`,
+          `Reservas activas: ${Math.min(reservas.length + 1, limiteReservasActivas)}/${limiteReservasActivas}`,
         ],
         confirm: null,
       });
@@ -90,8 +113,16 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
     return <p className="text-sm text-slate-600">Cargando agenda semanal...</p>;
   }
 
+  if (isLoadingReglas || !reglas) {
+    return <p className="text-sm text-slate-600">Cargando reglas de reserva...</p>;
+  }
+
   if (error) {
     return <p className="text-sm text-rose-700">{error?.response?.data?.error || 'Error consultando disponibilidad'}</p>;
+  }
+
+  if (errorReglas) {
+    return <p className="text-sm text-rose-700">{errorReglas?.response?.data?.error || 'Error consultando reglas de reserva'}</p>;
   }
 
   return (
@@ -109,13 +140,19 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-2xl font-bold text-slate-900">Agenda semanal</h2>
-        <p className="text-sm text-slate-600">Formato horario por bloques (lunes a viernes). Semana base: {lunes}</p>
-
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Reservas activas: {reservas.length}/{LIMITE_RESERVAS}</span>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Zona horaria: Colombia (UTC-5)</span>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Selecciona bloque y confirma</span>
-        </div>
+        {!soloLectura ? (
+          <>
+            <p className="text-sm text-slate-600">Formato horario por bloques (lunes a viernes). Semana base: {lunes}</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                Reservas activas: {reservas.length}/{limiteReservasActivas}
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Zona horaria: Colombia (UTC-5)</span>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-slate-600">Vista de monitoreo: solo cupos y nivel de saturacion.</p>
+        )}
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
@@ -150,7 +187,10 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
 
                 const yaReservada = idsReservados.has(f.id);
                 const sinCupo = f.cuposDisponibles <= 0;
-                const limiteAlcanzado = reservas.length >= LIMITE_RESERVAS;
+                const limiteAlcanzado = reservas.length >= limiteReservasActivas;
+                const fechaFranja = String(f.fecha || '').split('T')[0];
+                const reservasEseDia = reservasPorFecha.get(fechaFranja) || 0;
+                const limitePorDiaAlcanzado = reservasEseDia >= maxReservasPorDia;
 
                 let bloque = 'bg-white border-slate-300 hover:border-slate-500';
                 if (sinCupo) bloque = 'bg-slate-100 border-slate-300';
@@ -160,24 +200,26 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
                   <button
                     key={f.id}
                     onClick={() => (soloLectura ? null : pedirConfirmacion(f))}
-                    disabled={soloLectura || crearReserva.isPending || sinCupo || yaReservada || limiteAlcanzado}
-                    className={`rounded-lg border p-2 text-left text-[11px] transition ${bloque} disabled:cursor-not-allowed disabled:opacity-70`}
+                    disabled={soloLectura || crearReserva.isPending || sinCupo || yaReservada || limiteAlcanzado || limitePorDiaAlcanzado}
+                    className={`rounded-lg border p-2 ${soloLectura ? 'text-center text-xs' : 'text-left text-[11px]'} transition ${bloque} disabled:cursor-not-allowed disabled:opacity-70`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-slate-700">{f.cuposDisponibles}/{f.capacidadMaxima}</span>
                       <SaturacionBadge nivel={f.saturacion} />
                     </div>
-                    <p className="mt-1 text-slate-500">
-                      {soloLectura
-                        ? 'No disponible para reserva'
-                        : yaReservada
-                        ? 'Ya reservada'
-                        : sinCupo
-                        ? 'Sin cupos'
-                        : limiteAlcanzado
-                        ? 'Limite alcanzado'
-                        : 'Tocar para reservar'}
-                    </p>
+                    {!soloLectura ? (
+                      <p className="mt-1 text-slate-500">
+                        {yaReservada
+                          ? 'Ya reservada'
+                          : sinCupo
+                          ? 'Sin cupos'
+                          : limiteAlcanzado
+                          ? 'Limite alcanzado'
+                            : limitePorDiaAlcanzado
+                          ? 'Ya tienes reserva este dia'
+                          : 'Tocar para reservar'}
+                      </p>
+                    ) : null}
                   </button>
                 );
               })}

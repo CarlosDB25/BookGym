@@ -47,6 +47,36 @@ router.get('/', controller.misReservas);
 
 /**
  * @openapi
+ * /api/reservas/historial:
+ *   get:
+ *     tags:
+ *       - Reservas
+ *     summary: Listar historial de reservas del usuario autenticado
+ *     description: Devuelve reservas canceladas o reservas cuyo horario ya paso.
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Historial de reservas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Reserva'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         description: Error inesperado del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/historial', controller.historial);
+
+/**
+ * @openapi
  * /api/reservas:
  *   post:
  *     tags:
@@ -97,6 +127,12 @@ router.get('/', controller.misReservas);
  *               limite:
  *                 value:
  *                   error: Ya alcanzaste el limite de reservas activas
+ *               porDia:
+ *                 value:
+ *                   error: Solo puedes tener una reserva activa por dia
+ *               corte:
+ *                 value:
+ *                   error: La reserva solo esta permitida hasta 30 minutos antes del inicio del turno
  *               suspendido:
  *                 value:
  *                   error: Usuario suspendido temporalmente por inasistencia
@@ -118,7 +154,7 @@ router.post('/', controller.crear);
  *     tags:
  *       - Reservas
  *     summary: Cancelar reserva
- *     description: Cancela una reserva activa si faltan al menos 60 minutos para la hora de inicio.
+ *     description: Cancela una reserva activa si faltan al menos 15 minutos para la hora de inicio.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -148,7 +184,7 @@ router.post('/', controller.crear);
  *             examples:
  *               tiempo:
  *                 value:
- *                   error: Solo puedes cancelar hasta 1 hora antes de iniciar la franja
+ *                   error: Solo puedes cancelar hasta 15 minutos antes de iniciar la franja
  *               estado:
  *                 value:
  *                   error: La reserva ya no esta activa

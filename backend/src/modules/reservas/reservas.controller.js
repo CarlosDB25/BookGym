@@ -33,4 +33,13 @@ async function misReservas(req, res) {
   }
 }
 
-module.exports = { crear, cancelar, misReservas };
+async function historial(req, res) {
+  try {
+    const reservas = await service.obtenerHistorialReservas(req.usuario.id);
+    return res.json(reservas);
+  } catch (error) {
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+}
+
+module.exports = { crear, cancelar, misReservas, historial };

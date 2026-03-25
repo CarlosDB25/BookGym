@@ -14,6 +14,19 @@ export function useReservas() {
   });
 }
 
+export function useHistorialReservas() {
+  return useQuery({
+    queryKey: ['historial-reservas'],
+    queryFn: async () => {
+      const { data } = await api.get('/reservas/historial');
+      return data;
+    },
+    refetchInterval: 7000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+  });
+}
+
 export function useCrearReserva() {
   const queryClient = useQueryClient();
 
@@ -25,6 +38,8 @@ export function useCrearReserva() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['franjas-semana'] });
       queryClient.invalidateQueries({ queryKey: ['mis-reservas'] });
+      queryClient.invalidateQueries({ queryKey: ['historial-reservas'] });
+      queryClient.invalidateQueries({ queryKey: ['metricas-resumen'] });
     },
   });
 }
@@ -40,6 +55,8 @@ export function useCancelarReserva() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['franjas-semana'] });
       queryClient.invalidateQueries({ queryKey: ['mis-reservas'] });
+      queryClient.invalidateQueries({ queryKey: ['historial-reservas'] });
+      queryClient.invalidateQueries({ queryKey: ['metricas-resumen'] });
     },
   });
 }

@@ -1,5 +1,19 @@
 const prisma = require('../../shared/prisma/client');
 
+async function leerConfigConDefault(clave, valorDefecto, descripcionDefecto) {
+  let config = await prisma.configuracion.findUnique({ where: { clave } });
+  if (!config) {
+    config = await prisma.configuracion.create({
+      data: {
+        clave,
+        valor: String(valorDefecto),
+        descripcion: descripcionDefecto,
+      },
+    });
+  }
+  return parseInt(config.valor, 10);
+}
+
 function parseMonday(fecha) {
   const base = fecha ? new Date(`${fecha}T00:00:00`) : new Date();
   const day = base.getDay();
@@ -17,6 +31,12 @@ function inicioFranjaBogota(fechaDate, horaInicio) {
 }
 
 async function resumen(fecha) {
+  const minutosAnticipacionReserva = await leerConfigConDefault(
+    'anticipacion_reserva_min',
+    30,
+    'Minutos minimos de anticipacion para crear reserva'
+  );
+
   const inicio = parseMonday(fecha);
   const fin = new Date(inicio);
   fin.setDate(inicio.getDate() + 5);
@@ -27,7 +47,11 @@ async function resumen(fecha) {
   });
 
   const ahora = new Date();
-  const franjasVigentes = franjas.filter((f) => inicioFranjaBogota(f.fecha, f.plantilla.horaInicio) > ahora);
+  const franjasVigentes = franjas.filter((f) => {
+    const inicioFranja = inicioFranjaBogota(f.fecha, f.plantilla.horaInicio);
+    const limiteReserva = new Date(inicioFranja.getTime() - minutosAnticipacionReserva * 60 * 1000);
+    return ahora < limiteReserva;
+  });
   const idsFranjasVigentes = franjasVigentes.map((f) => f.id);
 
   const totalReservadas =

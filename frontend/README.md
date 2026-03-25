@@ -1,51 +1,77 @@
 # Frontend BookGym
 
-Cliente web del prototipo de reservas.
+Cliente web del sistema de reservas con dos experiencias: estudiante y administrador.
 
-## Stack
+## 1) Stack
 
 - React + Vite
 - Axios
 - TanStack Query
 - Tailwind CSS
 
-## Variables
+## 2) Configuración
 
-Crear .env basado en .env.example:
+Crear `.env` desde `.env.example`:
 
-- VITE_API_URL=https://bookgym-production.up.railway.app/api
+- `VITE_API_URL` (ejemplo local: `http://localhost:3000/api`)
 
-## Scripts
+## 3) Scripts
 
-- npm run dev
-- npm run build
-- npm run preview
+- `npm run dev`
+- `npm run build`
+- `npm run preview`
 
-## Flujo estudiante
+## 4) Flujo end-to-end en frontend
 
-- Login
-- Agenda semanal unificada por bloques (L-V)
-- Seleccion de bloque
-- Confirmacion intermedia en modal
-- Reserva y cancelacion con respuesta visual
+### Estudiante
 
-## Flujo administrador
+1. Inicia sesión y obtiene token.
+2. Carga agenda semanal y reglas operativas (`/configuracion/reglas-reserva`).
+3. Puede reservar si cumple ventanas/límites.
+4. Ve reservas activas y, en paralelo, historial.
+5. Cancela con confirmación modal (si está dentro de ventana permitida).
 
-- Panel de metricas semanales
-- Refresco manual y automatico de datos
-- Vista de agenda en modo solo lectura
+### Administrador
 
-## UX funcional
+1. Abre panel de métricas semanales.
+2. Ve datos recalculados periódicamente.
+3. Abre agenda modo lectura con foco en cupos/saturación.
 
-- Zona horaria Colombia (America/Bogota)
-- Bloques horarios con estados visibles: disponible, sin cupos, reservado, limite alcanzado
-- Modal de confirmacion antes de reservar
+## 5) Sincronización en vivo
 
-## Swagger del backend (referencia para frontend)
+El frontend usa polling + invalidaciones de React Query para reflejar cambios sin recargar:
 
-El frontend no expone Swagger propio; consume la API documentada en el backend.
+- franjas semanales
+- reservas activas
+- historial de reservas
+- métricas
 
-- Local UI: http://localhost:3000/api/docs
-- Local JSON: http://localhost:3000/api/docs.json
-- Railway UI: https://bookgym-production.up.railway.app/api/docs
-- Railway JSON: https://bookgym-production.up.railway.app/api/docs.json
+## 6) Reglas dinámicas (sin hardcode)
+
+El frontend no define cantidades/minutos como constantes de negocio; las obtiene desde backend:
+
+- `limiteReservasActivas`
+- `maxReservasPorDia`
+- `anticipacionReservaMin`
+- `anticipacionCancelacionMin`
+
+Endpoint consumido:
+
+- `GET /api/configuracion/reglas-reserva`
+
+## 7) UX funcional implementada
+
+- Zona horaria Colombia (`America/Bogota`)
+- Confirmación previa para reservar y cancelar
+- Separación de `Mis reservas activas` y `Historial`
+- Cancelación oculta/deshabilitada cuando la regla temporal ya no permite acción
+- Agenda admin en modo lectura simplificado
+
+## 8) Swagger backend (referencia para frontend)
+
+El frontend no expone Swagger propio; consume el del backend.
+
+- Local UI: `http://localhost:3000/api/docs`
+- Local JSON: `http://localhost:3000/api/docs.json`
+- Railway UI: `https://bookgym-production.up.railway.app/api/docs`
+- Railway JSON: `https://bookgym-production.up.railway.app/api/docs.json`

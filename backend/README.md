@@ -1,75 +1,113 @@
 # Backend BookGym
 
-API REST del prototipo de reservas del gimnasio universitario.
+API REST del prototipo de reservas de gimnasio universitario.
 
-## Stack
+## 1) Stack técnico
 
 - Node.js + Express
 - Prisma ORM
 - PostgreSQL
-- JWT para autenticacion
-- Swagger (OpenAPI)
+- JWT para autenticación
+- Swagger/OpenAPI para documentación
 
-## Variables de entorno
+## 2) Módulos funcionales
 
-Crear archivo .env basado en .env.example:
+- `auth`: login y generación de token
+- `franjas`: disponibilidad semanal
+- `reservas`: crear, listar activas, listar historial, cancelar
+- `metricas`: panel semanal de administración
+- `configuracion`: reglas operativas obtenidas desde BD
 
-- DATABASE_URL
-- JWT_SECRET
-- PORT
-- SWAGGER_SERVER_URL (opcional)
+## 3) Variables de entorno
 
-## Scripts
+Crear `.env` con base en `.env.example`:
 
-- npm run dev
-- npm run start
-- npm run seed
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `PORT`
+- `SWAGGER_SERVER_URL` (opcional)
 
-## Inicializacion de base de datos
+## 4) Scripts
 
-1. npx prisma migrate deploy
-2. node prisma/seed.js
+- `npm run dev`: desarrollo
+- `npm run start`: producción
+- `npm run seed`: datos iniciales
 
-## Endpoints principales
+## 5) Inicialización de base de datos
 
-- POST /api/auth/login
-- GET /api/franjas/semana?fecha=YYYY-MM-DD
-- GET /api/reservas
-- POST /api/reservas
-- DELETE /api/reservas/:id
+1. `npx prisma migrate deploy`
+2. `node prisma/seed.js`
 
-## Documentacion Swagger
+## 6) Reglas de negocio (source of truth en BD)
 
-- UI: /api/docs
-- JSON: /api/docs.json
+La tabla `configuracion` define reglas operativas sin hardcode en frontend ni backend.
 
-### Donde esta alojado exactamente
+Claves relevantes:
 
-Swagger no es un servicio separado: esta montado dentro del backend Express.
+- `limite_reservas_activas`
+- `max_reservas_por_dia`
+- `anticipacion_reserva_min`
+- `anticipacion_cancelacion_min`
 
-- Archivo de configuracion: src/docs/swagger.js
-- Integracion en app: src/app.js mediante setupSwagger(app)
-- Fuentes de anotaciones OpenAPI: src/modules/**/**.routes.js
+Comportamientos:
 
-### URLs de referencia
+- creación de reserva solo antes de la ventana de anticipación
+- cancelación solo antes de la ventana de cancelación
+- máximo de reservas activas por usuario
+- máximo de reservas activas por día
+- historial separado (canceladas o ya pasadas)
 
-- Local UI: http://localhost:3000/api/docs
-- Local JSON: http://localhost:3000/api/docs.json
-- Railway UI: https://bookgym-production.up.railway.app/api/docs
-- Railway JSON: https://bookgym-production.up.railway.app/api/docs.json
+## 7) Endpoints principales
 
-### Cobertura actual
+- `POST /api/auth/login`
+- `GET /api/franjas/semana?fecha=YYYY-MM-DD`
+- `GET /api/reservas`
+- `GET /api/reservas/historial`
+- `POST /api/reservas`
+- `DELETE /api/reservas/:id`
+- `GET /api/metricas/resumen?fecha=YYYY-MM-DD`
+- `GET /api/configuracion/reglas-reserva`
 
-- Auth: login con request/response y ejemplos
-- Franjas: disponibilidad semanal con parametros y respuesta tipada
-- Reservas: listar, crear, cancelar con errores de negocio documentados
-- Metricas: resumen semanal con control por rol administrador
-- Sistema: endpoint GET /health
+## 8) Flujo end-to-end backend
 
-## Reglas de negocio implementadas
+### Flujo de reserva
 
-- Bloqueo por suspension activa
-- Limite de reservas activas por usuario
-- Validacion de cupos disponibles
-- Transaccion atomica para crear reserva + descontar cupo
-- Cancelacion solo antes del inicio de la franja
+1. Usuario autenticado solicita crear reserva.
+2. Backend carga reglas de `configuracion`.
+3. Valida suspensión, cupo, límites, día y ventana de tiempo.
+4. Ejecuta transacción: decrementa cupo y crea reserva activa.
+5. Frontend invalida cachés y actualiza vistas.
+
+### Flujo de cancelación
+
+1. Usuario solicita cancelar reserva activa.
+2. Backend valida propiedad de reserva y ventana de cancelación.
+3. Transacción: estado cancelada + incremento de cupo.
+4. Reserva se mueve a historial en lecturas posteriores.
+
+### Flujo de métricas admin
+
+1. Admin solicita resumen semanal.
+2. Backend toma franjas reservables vigentes (descarta pasadas/no reservables).
+3. Calcula capacidad/disponibilidad/ocupación/saturación.
+4. Excluye canceladas por definición de conteo activo.
+
+## 9) Swagger
+
+Swagger está integrado en Express.
+
+- Configuración: `src/docs/swagger.js`
+- Montaje: `src/app.js`
+- Anotaciones: `src/modules/**/**.routes.js`
+
+URLs:
+
+- UI local: `http://localhost:3000/api/docs`
+- JSON local: `http://localhost:3000/api/docs.json`
+- UI Railway: `https://bookgym-production.up.railway.app/api/docs`
+- JSON Railway: `https://bookgym-production.up.railway.app/api/docs.json`
+
+## 10) Salud y operación
+
+- `GET /health`: validación de disponibilidad del servicio
+- `GET /api/configuracion/reglas-reserva`: diagnóstico rápido de reglas activas
