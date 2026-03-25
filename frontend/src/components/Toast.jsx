@@ -1,4 +1,12 @@
+import { useEffect } from 'react';
+
 export function Toast({ notice, onClose }) {
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = setTimeout(() => onClose(), 3500);
+    return () => clearTimeout(timer);
+  }, [notice, onClose]);
+
   if (!notice) return null;
 
   const styles =

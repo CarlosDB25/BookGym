@@ -15,6 +15,11 @@ function App() {
     setNotice({ type, message });
   }
 
+  function handleLogout() {
+    setNotice(null);
+    logout();
+  }
+
   if (!usuario) {
     return (
       <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-16 text-slate-800">
@@ -41,7 +46,7 @@ function App() {
 
           <button
             className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-            onClick={logout}
+            onClick={handleLogout}
           >
             Cerrar sesion
           </button>

@@ -1,5 +1,12 @@
 const prisma = require('../../shared/prisma/client');
 
+function inicioFranjaBogota(fechaDate, horaInicio) {
+  const y = fechaDate.getUTCFullYear();
+  const m = String(fechaDate.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(fechaDate.getUTCDate()).padStart(2, '0');
+  return new Date(`${y}-${m}-${d}T${horaInicio}:00-05:00`);
+}
+
 async function leerConfig(clave) {
   const config = await prisma.configuracion.findUnique({ where: { clave } });
 
@@ -33,6 +40,18 @@ async function crearReserva(idUsuario, idFranja) {
 
   if (activas >= limite) {
     throw new Error(`Limite de ${limite} reservas activas alcanzado`);
+  }
+
+  const yaReservada = await prisma.reserva.findFirst({
+    where: {
+      idUsuario,
+      idFranja,
+      estado: 'activa',
+    },
+  });
+
+  if (yaReservada) {
+    throw new Error('Ya tienes una reserva activa en esta franja');
   }
 
   return prisma.$transaction(async (tx) => {
@@ -77,12 +96,11 @@ async function cancelarReserva(idReserva, idUsuario) {
   }
 
   const ahora = new Date();
-  const inicioTurno = new Date(reserva.franja.fecha);
-  const [h, m] = reserva.franja.plantilla.horaInicio.split(':');
-  inicioTurno.setHours(parseInt(h, 10), parseInt(m, 10), 0, 0);
+  const inicioTurno = inicioFranjaBogota(reserva.franja.fecha, reserva.franja.plantilla.horaInicio);
+  const limiteCancelacion = new Date(inicioTurno.getTime() - 60 * 60 * 1000);
 
-  if (ahora >= inicioTurno) {
-    throw new Error('No es posible cancelar un turno que ya ha iniciado');
+  if (ahora >= limiteCancelacion) {
+    throw new Error('La cancelacion solo esta permitida hasta 1 hora antes del inicio del turno');
   }
 
   return prisma.$transaction(async (tx) => {
