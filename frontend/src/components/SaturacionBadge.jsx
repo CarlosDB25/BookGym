@@ -1,7 +1,7 @@
 const colores = {
-  baja: 'bg-emerald-100 text-emerald-800 ring-emerald-300',
-  media: 'bg-amber-100 text-amber-800 ring-amber-300',
-  alta: 'bg-rose-100 text-rose-800 ring-rose-300',
+  baja: 'bg-emerald-500/20 text-emerald-200 ring-emerald-400/40',
+  media: 'bg-amber-500/20 text-amber-200 ring-amber-400/40',
+  alta: 'bg-rose-500/20 text-rose-200 ring-rose-400/40',
 };
 
 export function SaturacionBadge({ nivel }) {
