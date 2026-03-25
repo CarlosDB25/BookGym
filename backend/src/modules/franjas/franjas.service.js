@@ -1,5 +1,19 @@
 const prisma = require('../../shared/prisma/client');
 
+async function leerConfigConDefault(clave, valorDefecto, descripcionDefecto) {
+  let config = await prisma.configuracion.findUnique({ where: { clave } });
+  if (!config) {
+    config = await prisma.configuracion.create({
+      data: {
+        clave,
+        valor: String(valorDefecto),
+        descripcion: descripcionDefecto,
+      },
+    });
+  }
+  return parseInt(config.valor, 10);
+}
+
 function inicioFranjaBogota(fechaDate, horaInicio) {
   const y = fechaDate.getUTCFullYear();
   const m = String(fechaDate.getUTCMonth() + 1).padStart(2, '0');
@@ -16,6 +30,12 @@ function nivelSaturacion(cuposDisponibles, capacidadMaxima) {
 }
 
 async function obtenerDisponibilidadSemana(fechaInicio) {
+  const anticipacionReservaMin = await leerConfigConDefault(
+    'anticipacion_reserva_min',
+    30,
+    'Minutos minimos de anticipacion para crear reserva'
+  );
+
   const inicio = new Date(fechaInicio);
   inicio.setHours(0, 0, 0, 0);
 
@@ -34,7 +54,11 @@ async function obtenerDisponibilidadSemana(fechaInicio) {
   });
 
   const ahora = new Date();
-  const franjasVigentes = franjas.filter((f) => inicioFranjaBogota(f.fecha, f.plantilla.horaInicio) > ahora);
+  const franjasVigentes = franjas.filter((f) => {
+    const inicioTurno = inicioFranjaBogota(f.fecha, f.plantilla.horaInicio);
+    const limiteReserva = new Date(inicioTurno.getTime() - anticipacionReservaMin * 60 * 1000);
+    return ahora < limiteReserva;
+  });
 
   return franjasVigentes.map((f) => ({
     id: f.id,

@@ -1,4 +1,5 @@
 const prisma = require('../../shared/prisma/client');
+const { Prisma } = require('@prisma/client');
 
 const CONFIG_DEFAULTS = {
   limite_reservas_activas: {
@@ -53,6 +54,8 @@ async function leerConfig(clave) {
 
 async function crearReserva(idUsuario, idFranja) {
   const minutosAnticipacionReserva = await leerConfig('anticipacion_reserva_min');
+  const limite = await leerConfig('limite_reservas_activas');
+  const maxReservasPorDia = await leerConfig('max_reservas_por_dia');
 
   const franjaObjetivo = await prisma.franja.findUnique({
     where: { id: idFranja },
@@ -85,61 +88,6 @@ async function crearReserva(idUsuario, idFranja) {
     throw new Error(`Usuario suspendido hasta ${new Date(suspension.fechaFin).toLocaleDateString('es-CO')}`);
   }
 
-  const limite = await leerConfig('limite_reservas_activas');
-  const maxReservasPorDia = await leerConfig('max_reservas_por_dia');
-  const activas = await prisma.reserva.count({
-    where: {
-      idUsuario,
-      estado: 'activa',
-    },
-  });
-
-  if (activas >= limite) {
-    throw new Error(`Limite de ${limite} reservas activas alcanzado`);
-  }
-
-  const reservaMismoDia = await prisma.reserva.findFirst({
-    where: {
-      idUsuario,
-      estado: 'activa',
-      franja: {
-        fecha: franjaObjetivo.fecha,
-      },
-    },
-  });
-
-  if (reservaMismoDia && maxReservasPorDia <= 1) {
-    throw new Error('Solo puedes tener una reserva activa por dia');
-  }
-
-  if (maxReservasPorDia > 1) {
-    const reservasMismoDia = await prisma.reserva.count({
-      where: {
-        idUsuario,
-        estado: 'activa',
-        franja: {
-          fecha: franjaObjetivo.fecha,
-        },
-      },
-    });
-
-    if (reservasMismoDia >= maxReservasPorDia) {
-      throw new Error(`Solo puedes tener ${maxReservasPorDia} reservas activas por dia`);
-    }
-  }
-
-  const yaReservada = await prisma.reserva.findFirst({
-    where: {
-      idUsuario,
-      idFranja,
-      estado: 'activa',
-    },
-  });
-
-  if (yaReservada) {
-    throw new Error('Ya tienes una reserva activa en esta franja');
-  }
-
   return prisma.$transaction(async (tx) => {
     const franja = await tx.franja.findUnique({
       where: { id: idFranja },
@@ -159,20 +107,66 @@ async function crearReserva(idUsuario, idFranja) {
       );
     }
 
-    if (franja.cuposDisponibles <= 0) {
-      throw new Error('Sin cupos disponibles en esta franja');
+    const activas = await tx.reserva.count({
+      where: {
+        idUsuario,
+        estado: 'activa',
+      },
+    });
+
+    if (activas >= limite) {
+      throw new Error(`Limite de ${limite} reservas activas alcanzado`);
     }
 
-    await tx.franja.update({
-      where: { id: idFranja },
-      data: { cuposDisponibles: { decrement: 1 } },
+    const reservasMismoDia = await tx.reserva.count({
+      where: {
+        idUsuario,
+        estado: 'activa',
+        franja: {
+          fecha: franja.fecha,
+        },
+      },
     });
+
+    if (reservasMismoDia >= maxReservasPorDia) {
+      if (maxReservasPorDia <= 1) {
+        throw new Error('Solo puedes tener una reserva activa por dia');
+      }
+      throw new Error(`Solo puedes tener ${maxReservasPorDia} reservas activas por dia`);
+    }
+
+    const yaReservada = await tx.reserva.findFirst({
+      where: {
+        idUsuario,
+        idFranja,
+        estado: 'activa',
+      },
+    });
+
+    if (yaReservada) {
+      throw new Error('Ya tienes una reserva activa en esta franja');
+    }
+
+    // Seccion critica: decremento atomico solo si todavia hay cupo.
+    const updateResult = await tx.franja.updateMany({
+      where: {
+        id: idFranja,
+        cuposDisponibles: { gt: 0 },
+      },
+      data: {
+        cuposDisponibles: { decrement: 1 },
+      },
+    });
+
+    if (updateResult.count !== 1) {
+      throw new Error('Sin cupos disponibles en esta franja');
+    }
 
     return tx.reserva.create({
       data: { idUsuario, idFranja, estado: 'activa' },
       include: { franja: { include: { plantilla: true } } },
     });
-  });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }
 
 async function cancelarReserva(idReserva, idUsuario) {
