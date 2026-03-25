@@ -42,6 +42,30 @@ Prototipo funcional para gestion de reservas de un gimnasio universitario.
 - Swagger UI: /api/docs
 - OpenAPI JSON: /api/docs.json
 
+### Ubicacion exacta de Swagger
+
+- Configuracion OpenAPI: backend/src/docs/swagger.js
+- Montaje en Express: backend/src/app.js (setupSwagger)
+- Anotaciones por ruta:
+	- backend/src/modules/auth/auth.routes.js
+	- backend/src/modules/franjas/franjas.routes.js
+	- backend/src/modules/reservas/reservas.routes.js
+	- backend/src/modules/metricas/metricas.routes.js
+
+### URLs de acceso
+
+- Local UI: http://localhost:3000/api/docs
+- Local JSON: http://localhost:3000/api/docs.json
+- Produccion UI (Railway): https://bookgym-production.up.railway.app/api/docs
+- Produccion JSON (Railway): https://bookgym-production.up.railway.app/api/docs.json
+
+### Que incluye ahora
+
+- Tags por modulo (Auth, Franjas, Reservas, Metricas, Sistema)
+- Esquemas tipados con ejemplos reales
+- Respuestas documentadas por codigo (200/201/400/401/403/500)
+- Endpoint de salud /health en OpenAPI
+
 ## Despliegue en Railway
 
 ### Backend

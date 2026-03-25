@@ -43,6 +43,29 @@ Crear archivo .env basado en .env.example:
 - UI: /api/docs
 - JSON: /api/docs.json
 
+### Donde esta alojado exactamente
+
+Swagger no es un servicio separado: esta montado dentro del backend Express.
+
+- Archivo de configuracion: src/docs/swagger.js
+- Integracion en app: src/app.js mediante setupSwagger(app)
+- Fuentes de anotaciones OpenAPI: src/modules/**/**.routes.js
+
+### URLs de referencia
+
+- Local UI: http://localhost:3000/api/docs
+- Local JSON: http://localhost:3000/api/docs.json
+- Railway UI: https://bookgym-production.up.railway.app/api/docs
+- Railway JSON: https://bookgym-production.up.railway.app/api/docs.json
+
+### Cobertura actual
+
+- Auth: login con request/response y ejemplos
+- Franjas: disponibilidad semanal con parametros y respuesta tipada
+- Reservas: listar, crear, cancelar con errores de negocio documentados
+- Metricas: resumen semanal con control por rol administrador
+- Sistema: endpoint GET /health
+
 ## Reglas de negocio implementadas
 
 - Bloqueo por suspension activa
