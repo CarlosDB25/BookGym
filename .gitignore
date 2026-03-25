@@ -22,3 +22,6 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Archivos de referencia inicial
+doc2_guia_prototipo.docx
