@@ -13,6 +13,7 @@ const options = {
       { name: 'Auth', description: 'Autenticacion y entrega de JWT' },
       { name: 'Franjas', description: 'Disponibilidad semanal de franjas' },
       { name: 'Reservas', description: 'Creacion, consulta y cancelacion de reservas' },
+      { name: 'Asistencia', description: 'Registro de check-in de reservas' },
       { name: 'Metricas', description: 'Resumen operativo semanal (solo administrador)' },
       { name: 'Sistema', description: 'Salud y soporte del servicio' },
     ],
@@ -66,7 +67,7 @@ const options = {
             idUsuario: { type: 'string', example: 'EST001' },
             idFranja: { type: 'string', example: 'db7f392c-add9-47b9-8b99-261ecd6d360c' },
             fechaCreacion: { type: 'string', format: 'date-time' },
-            estado: { type: 'string', enum: ['activa', 'cancelada'] },
+            estado: { type: 'string', enum: ['activa', 'cancelada', 'completada'] },
             franja: {
               type: 'object',
               properties: {
@@ -110,6 +111,16 @@ const options = {
             saturacionMedia: { type: 'integer', example: 11 },
             saturacionBaja: { type: 'integer', example: 61 },
             totalFranjas: { type: 'integer', example: 75 },
+          },
+        },
+        Asistencia: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'b7f1a2c3-4d5e-6f7g-8h9i-0j1k2l3m4n5o' },
+            idReserva: { type: 'string', example: '867efc16-0b12-4b5a-ab5b-0390b4e14b3b' },
+            registradoPor: { type: 'string', example: 'EST001' },
+            resultado: { type: 'string', enum: ['presente', 'no_show'] },
+            registradoEn: { type: 'string', format: 'date-time' },
           },
         },
         ErrorResponse: {
