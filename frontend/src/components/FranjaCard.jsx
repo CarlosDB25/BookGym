@@ -2,22 +2,22 @@ import { SaturacionBadge } from './SaturacionBadge';
 
 export function FranjaCard({ franja, onReservar, reservando }) {
   return (
-    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
+    <article className="surface p-4 transition hover:shadow-md">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">{franja.diaSemana}</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--muted)]">{franja.diaSemana}</h3>
         <SaturacionBadge nivel={franja.saturacion} />
       </div>
 
-      <p className="mt-3 text-lg font-bold text-slate-900">
+      <p className="mt-3 text-lg font-bold text-[color:var(--ink)]">
         {franja.horaInicio} - {franja.horaFin}
       </p>
 
-      <p className="text-sm text-slate-600">
+      <p className="text-sm text-[color:var(--muted)]">
         Cupos: <strong>{franja.cuposDisponibles}</strong> / {franja.capacidadMaxima}
       </p>
 
       <button
-        className="mt-4 w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+        className="btn-primary mt-4 w-full rounded-full px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60"
         onClick={() => onReservar(franja.id)}
         disabled={reservando || franja.cuposDisponibles <= 0}
       >

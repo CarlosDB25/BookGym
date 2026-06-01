@@ -1,20 +1,21 @@
 import { useMemo, useState } from 'react';
 import { SaturacionBadge } from '../components/SaturacionBadge';
 import { ActionModal } from '../components/ActionModal';
-import { useCrearReserva, useReservas } from '../hooks/useReservas';
+import { useCrearReserva, useHistorialReservas, useReservas } from '../hooks/useReservas';
 import { useFranjas } from '../hooks/useFranjas';
 import { useReglasReserva } from '../hooks/useReglasReserva';
-import { getBogotaNowMillis, getBogotaTodayYMD, mondayFromYMD, slotMillisBogota } from '../utils/time';
-
-const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
+import { formatDateBogota, getBogotaNowMillis, getBogotaTodayYMD, mondayFromYMD, slotMillisBogota } from '../utils/time';
 
 export function Disponibilidad({ soloLectura = false, onNotice }) {
   const lunes = useMemo(() => mondayFromYMD(getBogotaTodayYMD()), []);
+  const hoyYmd = getBogotaTodayYMD();
   const [modal, setModal] = useState({ open: false, type: 'info', title: '', lines: [], confirm: null });
   const [pendiente, setPendiente] = useState(null);
+  const [vista, setVista] = useState(soloLectura ? 'semana' : 'hoy');
 
   const { data: franjas = [], isLoading, error } = useFranjas(lunes, true);
   const { data: reservas = [] } = useReservas();
+  const { data: historial = [] } = useHistorialReservas();
   const { data: reglas, isLoading: isLoadingReglas, error: errorReglas } = useReglasReserva();
   const crearReserva = useCrearReserva();
 
@@ -44,19 +45,103 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
     });
   }, [franjas, nowMillis, msAnticipacionReserva]);
 
-  const horas = useMemo(() => {
-    const hs = [...new Set(franjasVigentes.map((f) => f.horaInicio))];
-    hs.sort((a, b) => a.localeCompare(b));
-    return hs;
-  }, [franjasVigentes]);
-
-  const mapa = useMemo(() => {
-    const m = new Map();
-    for (const franja of franjasVigentes) {
-      m.set(`${franja.diaSemana}|${franja.horaInicio}`, franja);
+  const franjasFiltradas = useMemo(() => {
+    if (vista === 'hoy') {
+      return franjasVigentes.filter((f) => String(f.fecha || '').startsWith(hoyYmd));
     }
-    return m;
-  }, [franjasVigentes]);
+    return franjasVigentes;
+  }, [franjasVigentes, vista, hoyYmd]);
+
+  const franjasPorDia = useMemo(() => {
+    const map = new Map();
+    for (const franja of franjasFiltradas) {
+      const ymd = String(franja.fecha || '').split('T')[0];
+      if (!ymd) continue;
+      if (!map.has(ymd)) map.set(ymd, []);
+      map.get(ymd).push(franja);
+    }
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([ymd, items]) => ({
+        ymd,
+        items: items.sort((a, b) => a.horaInicio.localeCompare(b.horaInicio)),
+      }));
+  }, [franjasFiltradas]);
+
+  const proximaReserva = useMemo(() => {
+    const candidatas = reservas
+      .map((reserva) => {
+        const franja = reserva.franja;
+        if (!franja) return null;
+        const horaInicio = franja.plantilla?.horaInicio || franja.horaInicio;
+        const horaFin = franja.plantilla?.horaFin || franja.horaFin;
+        if (!horaInicio || !franja.fecha) return null;
+        const inicio = slotMillisBogota(franja.fecha, horaInicio);
+        return {
+          id: reserva.id,
+          inicio,
+          horaInicio,
+          horaFin,
+          fecha: franja.fecha,
+        };
+      })
+      .filter(Boolean)
+      .filter((r) => r.inicio > nowMillis)
+      .sort((a, b) => a.inicio - b.inicio);
+
+    return candidatas[0] || null;
+  }, [reservas, nowMillis]);
+
+  const completadas = useMemo(() => {
+    return historial.filter((reserva) => String(reserva.estado || '').toLowerCase() !== 'cancelada');
+  }, [historial]);
+
+  const diasAsistencia = useMemo(() => {
+    const set = new Set();
+    for (const reserva of completadas) {
+      const ymd = String(reserva.franja?.fecha || '').split('T')[0];
+      if (ymd) set.add(ymd);
+    }
+    return [...set].sort();
+  }, [completadas]);
+
+  const rachaActual = useMemo(() => {
+    if (diasAsistencia.length === 0) return 0;
+    let streak = 1;
+    for (let i = diasAsistencia.length - 1; i > 0; i -= 1) {
+      const [y1, m1, d1] = diasAsistencia[i].split('-').map(Number);
+      const [y2, m2, d2] = diasAsistencia[i - 1].split('-').map(Number);
+      const diff = (Date.UTC(y1, m1 - 1, d1) - Date.UTC(y2, m2 - 1, d2)) / 86400000;
+      if (diff === 1) {
+        streak += 1;
+      } else {
+        break;
+      }
+    }
+    return streak;
+  }, [diasAsistencia]);
+
+  const asistenciasMes = useMemo(() => {
+    const prefijo = hoyYmd.slice(0, 7);
+    return completadas.filter((reserva) => String(reserva.franja?.fecha || '').startsWith(prefijo)).length;
+  }, [completadas, hoyYmd]);
+
+  const horaPico = useMemo(() => {
+    if (franjasFiltradas.length === 0) return null;
+    const map = new Map();
+    for (const franja of franjasFiltradas) {
+      const score = franja.saturacion === 'alta' ? 3 : franja.saturacion === 'media' ? 2 : 1;
+      map.set(franja.horaInicio, (map.get(franja.horaInicio) || 0) + score);
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+  }, [franjasFiltradas]);
+
+  const recomendadas = useMemo(() => {
+    return franjasFiltradas
+      .filter((f) => f.saturacion === 'baja' && f.cuposDisponibles > 0)
+      .sort((a, b) => b.cuposDisponibles - a.cuposDisponibles || a.horaInicio.localeCompare(b.horaInicio))
+      .slice(0, 3);
+  }, [franjasFiltradas]);
 
   function pedirConfirmacion(franja) {
     setPendiente(franja);
@@ -65,13 +150,10 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
       type: 'info',
       title: 'Confirmar reserva',
       lines: [
-        `Dia: ${franja.diaSemana}`,
-        `Horario: ${franja.horaInicio} - ${franja.horaFin}`,
-        `Cupos disponibles: ${franja.cuposDisponibles}`,
-        'Condiciones:',
-        `- Maximo ${maxReservasPorDia} reserva(s) activa(s) por dia.`,
-        `- Reserva permitida hasta ${anticipacionReservaMin} minutos antes del inicio.`,
-        `- Cancelacion permitida hasta ${anticipacionCancelacionMin} minutos antes del inicio.`,
+        `${franja.diaSemana} · ${franja.horaInicio} - ${franja.horaFin}`,
+        `Cupos disponibles: ${franja.cuposDisponibles}/${franja.capacidadMaxima}`,
+        `Maximo por dia: ${maxReservasPorDia} · Reserva hasta ${anticipacionReservaMin} min antes.`,
+        `Cancelacion hasta ${anticipacionCancelacionMin} min antes.`,
       ],
       confirm: 'reservar',
     });
@@ -82,14 +164,13 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
 
     try {
       await crearReserva.mutateAsync(pendiente.id);
-      onNotice?.('success', 'Reserva registrada y cupo actualizado en tiempo real.');
+      onNotice?.('success', 'Reserva confirmada.');
       setModal({
         open: true,
         type: 'success',
-        title: 'Reserva exitosa',
+        title: 'Reserva confirmada',
         lines: [
-          `${pendiente.diaSemana} ${pendiente.horaInicio}-${pendiente.horaFin}`,
-          `Estado: activa`,
+          `${pendiente.diaSemana} · ${pendiente.horaInicio}-${pendiente.horaFin}`,
           `Reservas activas: ${Math.min(reservas.length + 1, limiteReservasActivas)}/${limiteReservasActivas}`,
         ],
         confirm: null,
@@ -101,7 +182,7 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
         open: true,
         type: 'error',
         title: 'Reserva rechazada',
-        lines: [msg, 'El servidor valido restricciones y no permitio la operacion.'],
+        lines: [msg],
         confirm: null,
       });
     } finally {
@@ -110,11 +191,11 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-slate-600">Cargando agenda semanal...</p>;
+    return <p className="text-sm text-[color:var(--muted)]">Cargando agenda...</p>;
   }
 
   if (isLoadingReglas || !reglas) {
-    return <p className="text-sm text-slate-600">Cargando reglas de reserva...</p>;
+    return <p className="text-sm text-[color:var(--muted)]">Cargando reglas de reserva...</p>;
   }
 
   if (error) {
@@ -126,7 +207,7 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
   }
 
   return (
-    <section className="fade-in space-y-4">
+    <section className="fade-in space-y-5">
       <ActionModal
         open={modal.open}
         type={modal.type}
@@ -134,99 +215,151 @@ export function Disponibilidad({ soloLectura = false, onNotice }) {
         lines={modal.lines}
         onClose={() => setModal((m) => ({ ...m, open: false, confirm: null }))}
         onConfirm={modal.confirm === 'reservar' ? confirmarReserva : undefined}
-        confirmLabel="Confirmar"
+        confirmLabel="Reservar"
         cancelLabel="Volver"
       />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-2xl font-bold text-slate-900">Agenda semanal</h2>
-        {!soloLectura ? (
-          <>
-            <p className="text-sm text-slate-600">Formato horario por bloques (lunes a viernes). Semana base: {lunes}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
-                Reservas activas: {reservas.length}/{limiteReservasActivas}
-              </span>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">Zona horaria: Colombia (UTC-5)</span>
+      <div className="panel p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-[color:var(--ink)]">Agenda</h2>
+            <p className="mt-1 text-sm text-[color:var(--muted)]">Selecciona una franja y confirma.</p>
+          </div>
+          {!soloLectura ? (
+            <div className="flex gap-2">
+              <button onClick={() => setVista('hoy')} className={`tab ${vista === 'hoy' ? 'tab-active' : ''}`}>
+                Hoy
+              </button>
+              <button onClick={() => setVista('semana')} className={`tab ${vista === 'semana' ? 'tab-active' : ''}`}>
+                Semana
+              </button>
             </div>
-          </>
-        ) : (
-          <p className="text-sm text-slate-600">Vista de monitoreo: solo cupos y nivel de saturacion.</p>
-        )}
+          ) : (
+            <span className="meta">Solo lectura</span>
+          )}
+        </div>
+
+        {!soloLectura ? (
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            <div className="stat-card p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">Proxima reserva</p>
+              {proximaReserva ? (
+                <div className="mt-2 text-sm text-[color:var(--ink)]">
+                  <p className="text-lg font-bold">{proximaReserva.horaInicio}</p>
+                  <p className="text-xs text-[color:var(--muted)]">{formatDateBogota(proximaReserva.fecha)}</p>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-[color:var(--muted)]">Sin reservas activas.</p>
+              )}
+            </div>
+            <div className="stat-card p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">Racha</p>
+              <p className="mt-2 text-2xl font-bold text-[color:var(--ink)]">{rachaActual} dias</p>
+              <p className="text-xs text-[color:var(--muted)]">{asistenciasMes} asistencias este mes</p>
+            </div>
+            <div className="stat-card p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">Hora pico</p>
+              <p className="mt-2 text-2xl font-bold text-[color:var(--ink)]">{horaPico || 'Sin datos'}</p>
+              <p className="text-xs text-[color:var(--muted)]">Evita esta franja para mas cupo.</p>
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="grid min-w-[1100px] grid-cols-6 gap-2">
-          <div className="rounded-lg bg-slate-100 p-2 text-center text-xs font-bold uppercase tracking-wide text-slate-700">Hora</div>
-          {DIAS.map((dia) => (
-            <div key={dia} className="rounded-lg bg-slate-100 p-2 text-center text-xs font-bold uppercase tracking-wide text-slate-700">
-              {dia}
-            </div>
-          ))}
+      {!soloLectura ? (
+        <div className="panel p-4">
+          <div className="flex flex-wrap gap-2 text-xs">
+            <span className="tag-success rounded-full px-3 py-1 font-semibold">Baja</span>
+            <span className="tag-warning rounded-full px-3 py-1 font-semibold">Media</span>
+            <span className="tag-danger rounded-full px-3 py-1 font-semibold">Alta</span>
+          </div>
+        </div>
+      ) : null}
 
-          {horas.length === 0 ? (
-            <div className="col-span-6 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-center text-sm text-slate-500">
-              No hay franjas futuras para mostrar en esta semana.
-            </div>
-          ) : null}
-
-          {horas.map((hora) => (
-            <div key={`row-${hora}`} className="contents">
-              <div key={`h-${hora}`} className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs font-semibold text-slate-700">
-                {hora}
+      {franjasPorDia.length === 0 ? (
+        <div className="empty-state">
+          {vista === 'hoy'
+            ? 'No hay franjas disponibles hoy. Prueba la vista Semana.'
+            : 'No hay franjas futuras disponibles.'}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {franjasPorDia.map((grupo) => (
+            <div key={grupo.ymd} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="section-title">{formatDateBogota(grupo.ymd)}</h3>
+                <span className="meta">{grupo.items.length} franjas</span>
               </div>
-              {DIAS.map((dia) => {
-                const f = mapa.get(`${dia}|${hora}`);
-                if (!f) {
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {grupo.items.map((franja) => {
+                  const yaReservada = idsReservados.has(franja.id);
+                  const sinCupo = franja.cuposDisponibles <= 0;
+                  const limiteAlcanzado = reservas.length >= limiteReservasActivas;
+                  const fechaFranja = String(franja.fecha || '').split('T')[0];
+                  const reservasEseDia = reservasPorFecha.get(fechaFranja) || 0;
+                  const limitePorDiaAlcanzado = reservasEseDia >= maxReservasPorDia;
+                  const deshabilitado = sinCupo || yaReservada || limiteAlcanzado || limitePorDiaAlcanzado;
+
+                  let estado = 'Disponible';
+                  if (yaReservada) estado = 'Reservada';
+                  else if (sinCupo) estado = 'Lleno';
+                  else if (limiteAlcanzado) estado = 'Limite activo';
+                  else if (limitePorDiaAlcanzado) estado = 'Reserva diaria';
+
                   return (
-                    <div key={`${dia}-${hora}`} className="rounded-lg border border-slate-100 bg-slate-50 p-2 text-center text-[11px] text-slate-400">
-                      -
-                    </div>
+                    <article key={franja.id} className="franja-card">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">Horario</p>
+                          <p className="text-2xl font-bold text-[color:var(--ink)]">{franja.horaInicio}</p>
+                          <p className="text-xs text-[color:var(--muted)]">Hasta {franja.horaFin}</p>
+                        </div>
+                        <SaturacionBadge nivel={franja.saturacion} />
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-[color:var(--muted)]">
+                        <span>
+                          Cupos: <strong className="text-[color:var(--ink)]">{franja.cuposDisponibles}</strong>/{franja.capacidadMaxima}
+                        </span>
+                        <span>{estado}</span>
+                      </div>
+                      {!soloLectura ? (
+                        <button
+                          className={`btn-primary rounded-md px-3 py-2 text-sm font-semibold transition ${
+                            deshabilitado ? 'opacity-60 cursor-not-allowed' : ''
+                          }`}
+                          onClick={() => pedirConfirmacion(franja)}
+                          disabled={deshabilitado || crearReserva.isPending}
+                        >
+                          {crearReserva.isPending ? 'Reservando...' : yaReservada ? 'Reservada' : sinCupo ? 'Lleno' : 'Reservar'}
+                        </button>
+                      ) : null}
+                    </article>
                   );
-                }
-
-                const yaReservada = idsReservados.has(f.id);
-                const sinCupo = f.cuposDisponibles <= 0;
-                const limiteAlcanzado = reservas.length >= limiteReservasActivas;
-                const fechaFranja = String(f.fecha || '').split('T')[0];
-                const reservasEseDia = reservasPorFecha.get(fechaFranja) || 0;
-                const limitePorDiaAlcanzado = reservasEseDia >= maxReservasPorDia;
-
-                let bloque = 'bg-white border-slate-300 hover:border-slate-500';
-                if (sinCupo) bloque = 'bg-slate-100 border-slate-300';
-                if (yaReservada) bloque = 'bg-emerald-50 border-emerald-300';
-
-                return (
-                  <button
-                    key={f.id}
-                    onClick={() => (soloLectura ? null : pedirConfirmacion(f))}
-                    disabled={soloLectura || crearReserva.isPending || sinCupo || yaReservada || limiteAlcanzado || limitePorDiaAlcanzado}
-                    className={`rounded-lg border p-2 ${soloLectura ? 'text-center text-xs' : 'text-left text-[11px]'} transition ${bloque} disabled:cursor-not-allowed disabled:opacity-70`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-700">{f.cuposDisponibles}/{f.capacidadMaxima}</span>
-                      <SaturacionBadge nivel={f.saturacion} />
-                    </div>
-                    {!soloLectura ? (
-                      <p className="mt-1 text-slate-500">
-                        {yaReservada
-                          ? 'Ya reservada'
-                          : sinCupo
-                          ? 'Sin cupos'
-                          : limiteAlcanzado
-                          ? 'Limite alcanzado'
-                            : limitePorDiaAlcanzado
-                          ? 'Ya tienes reserva este dia'
-                          : 'Tocar para reservar'}
-                      </p>
-                    ) : null}
-                  </button>
-                );
-              })}
+                })}
+              </div>
             </div>
           ))}
         </div>
-      </div>
+      )}
+
+      {!soloLectura ? (
+        <div className="panel p-5">
+          <h3 className="section-title">Sugerencias</h3>
+          {recomendadas.length === 0 ? (
+            <p className="mt-2 text-sm text-[color:var(--muted)]">Sin recomendaciones por ahora.</p>
+          ) : (
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              {recomendadas.map((franja) => (
+                <div key={franja.id} className="surface-soft px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">Recomendada</p>
+                  <p className="mt-1 text-lg font-bold text-[color:var(--ink)]">{franja.horaInicio}</p>
+                  <p className="text-xs text-[color:var(--muted)]">{formatDateBogota(franja.fecha)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

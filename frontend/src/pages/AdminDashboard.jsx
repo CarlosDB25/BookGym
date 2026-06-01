@@ -23,44 +23,61 @@ export function AdminDashboard() {
 
   return (
     <section className="fade-in space-y-5">
-      <h2 className="text-2xl font-bold text-slate-900">Panel administrativo semanal</h2>
-      <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-        <span>Semana: {resumen?.semana || fecha}</span>
-        <span>Alcance: solo franjas vigentes (sin pasadas ni canceladas)</span>
-        <span>Ultima actualizacion: {new Date(dataUpdatedAt).toLocaleTimeString('es-CO')}</span>
-        <button
-          onClick={() => refetch()}
-          className="rounded-md border border-slate-300 bg-white px-3 py-1 font-semibold text-slate-700 hover:bg-slate-100"
-        >
-          {isFetching ? 'Actualizando...' : 'Actualizar ahora'}
-        </button>
+      <div className="surface p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-[color:var(--ink)]">Panel administrativo semanal</h2>
+            <p className="mt-1 text-sm text-[color:var(--muted)]">Solo franjas vigentes.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[color:var(--muted)]">
+            <span className="rounded-md border border-[color:var(--border)] bg-[color:var(--surface-muted)] px-3 py-2 font-semibold uppercase tracking-[0.2em]">
+              Semana {resumen?.semana || fecha}
+            </span>
+            <span>Ultima actualizacion: {new Date(dataUpdatedAt).toLocaleTimeString('es-CO')}</span>
+            <button
+              onClick={() => refetch()}
+              className="btn-outline rounded-md px-4 py-2 text-xs font-semibold transition"
+            >
+              {isFetching ? 'Actualizando...' : 'Actualizar ahora'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 card-rise">
-          <p className="text-xs uppercase tracking-wider text-slate-500">Reservas realizadas</p>
-          <p className="mt-2 text-3xl font-extrabold text-slate-900">{resumen?.totalReservadas ?? 0}</p>
+        <article className="stat-card p-4 card-rise">
+          <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">Reservas realizadas</p>
+          <p className="mt-2 text-3xl font-bold text-[color:var(--ink)]">{resumen?.totalReservadas ?? 0}</p>
         </article>
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 card-rise">
-          <p className="text-xs uppercase tracking-wider text-slate-500">Cupos disponibles</p>
-          <p className="mt-2 text-3xl font-extrabold text-slate-900">{resumen?.totalDisponibles ?? 0}</p>
+        <article className="stat-card p-4 card-rise">
+          <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">Cupos disponibles</p>
+          <p className="mt-2 text-3xl font-bold text-[color:var(--ink)]">{resumen?.totalDisponibles ?? 0}</p>
         </article>
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 card-rise">
-          <p className="text-xs uppercase tracking-wider text-slate-500">Capacidad total</p>
-          <p className="mt-2 text-3xl font-extrabold text-slate-900">{resumen?.totalCapacidad ?? 0}</p>
+        <article className="stat-card p-4 card-rise">
+          <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">Capacidad total</p>
+          <p className="mt-2 text-3xl font-bold text-[color:var(--ink)]">{resumen?.totalCapacidad ?? 0}</p>
         </article>
-        <article className="rounded-2xl border border-slate-200 bg-white p-4 card-rise">
-          <p className="text-xs uppercase tracking-wider text-slate-500">Ocupacion promedio</p>
-          <p className="mt-2 text-3xl font-extrabold text-slate-900">{resumen?.ocupacionPromedio ?? 0}%</p>
+        <article className="stat-card p-4 card-rise">
+          <p className="text-xs uppercase tracking-[0.2em] text-[color:var(--muted)]">Ocupacion promedio</p>
+          <p className="mt-2 text-3xl font-bold text-[color:var(--ink)]">{resumen?.ocupacionPromedio ?? 0}%</p>
         </article>
       </div>
 
-      <article className="rounded-2xl border border-slate-200 bg-white p-4 card-rise">
-        <h3 className="text-lg font-bold text-slate-900">Distribucion de saturacion (franjas)</h3>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl bg-rose-50 p-3 text-rose-700">Alta: {resumen?.saturacionAlta ?? 0}</div>
-          <div className="rounded-xl bg-amber-50 p-3 text-amber-700">Media: {resumen?.saturacionMedia ?? 0}</div>
-          <div className="rounded-xl bg-emerald-50 p-3 text-emerald-700">Baja: {resumen?.saturacionBaja ?? 0}</div>
+      <article className="surface p-5 card-rise">
+        <h3 className="text-lg font-bold text-[color:var(--ink)]">Distribucion de saturacion (franjas)</h3>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="tag-danger rounded-xl p-3">
+            <p className="text-xs uppercase tracking-[0.2em]">Alta</p>
+            <p className="mt-2 text-2xl font-bold">{resumen?.saturacionAlta ?? 0}</p>
+          </div>
+          <div className="tag-warning rounded-xl p-3">
+            <p className="text-xs uppercase tracking-[0.2em]">Media</p>
+            <p className="mt-2 text-2xl font-bold">{resumen?.saturacionMedia ?? 0}</p>
+          </div>
+          <div className="tag-success rounded-xl p-3">
+            <p className="text-xs uppercase tracking-[0.2em]">Baja</p>
+            <p className="mt-2 text-2xl font-bold">{resumen?.saturacionBaja ?? 0}</p>
+          </div>
         </div>
       </article>
     </section>

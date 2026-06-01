@@ -1,13 +1,12 @@
 import { ReservaItem } from '../components/ReservaItem';
 import { ActionModal } from '../components/ActionModal';
-import { useCancelarReserva, useHistorialReservas, useReservas } from '../hooks/useReservas';
+import { useCancelarReserva, useReservas } from '../hooks/useReservas';
 import { useReglasReserva } from '../hooks/useReglasReserva';
 import { useState } from 'react';
 import { getBogotaNowMillis, slotMillisBogota } from '../utils/time';
 
 export function MisReservas({ onNotice }) {
   const { data: reservas = [], isLoading, error } = useReservas();
-  const { data: historial = [] } = useHistorialReservas();
   const { data: reglas, isLoading: isLoadingReglas, error: errorReglas } = useReglasReserva();
   const cancelar = useCancelarReserva();
   const [modal, setModal] = useState({ open: false, type: 'info', title: '', lines: [], confirm: null });
@@ -75,7 +74,7 @@ export function MisReservas({ onNotice }) {
   }
 
   return (
-    <section className="fade-in">
+    <section className="fade-in space-y-5">
       <ActionModal
         open={modal.open}
         type={modal.type}
@@ -87,12 +86,23 @@ export function MisReservas({ onNotice }) {
         cancelLabel="No"
       />
 
-      <h2 className="mb-4 text-2xl font-bold text-slate-900">Mis reservas activas</h2>
+      <div className="surface p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-[color:var(--ink)]">Mis reservas</h2>
+            <p className="mt-1 text-sm text-[color:var(--muted)]">
+              Cancelacion hasta {anticipacionCancelacionMin} min antes.
+            </p>
+          </div>
+          <div className="step">
+            <span className="font-bold text-[color:var(--accent)]">Paso</span>
+            <span>Selecciona · Confirma · Listo</span>
+          </div>
+        </div>
+      </div>
 
       {reservas.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600 card-rise">
-          No tienes reservas activas.
-        </p>
+        <div className="empty-state">No tienes reservas activas. Reserva un horario para comenzar 💪</div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {reservas.map((reserva) => {
@@ -113,19 +123,6 @@ export function MisReservas({ onNotice }) {
               />
             );
           })}
-        </div>
-      )}
-
-      <h3 className="mt-8 mb-4 text-xl font-bold text-slate-900">Historial de reservas</h3>
-      {historial.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-600 card-rise">
-          No hay historial para mostrar.
-        </p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {historial.map((reserva) => (
-            <ReservaItem key={reserva.id} reserva={reserva} cancelando={false} onCancelar={null} />
-          ))}
         </div>
       )}
     </section>

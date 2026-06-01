@@ -8,6 +8,12 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      var $RefreshReg$ = window.$RefreshReg$ || (() => {});
+      var $RefreshSig$ = window.$RefreshSig$ || (() => (type) => type);
+      window.$RefreshReg$ = $RefreshReg$;
+      window.$RefreshSig$ = $RefreshSig$;
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -18,6 +18,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Skills / agents
+.agents/
+skills-lock.json
+
 # OS / editor
 .DS_Store
 Thumbs.db
@@ -26,3 +30,5 @@ Thumbs.db
 # Archivos de referencia inicial
 doc2_guia_prototipo.docx
 secuencia-Reserva.png
+CONTEXT.md
+ESTADO_IMPLEMENTACION.md
