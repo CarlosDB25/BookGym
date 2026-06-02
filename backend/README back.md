@@ -15,6 +15,7 @@ API REST sistema de reservas de gimnasio universitario.
 - `auth`: login y generación de token
 - `franjas`: disponibilidad semanal
 - `reservas`: crear, listar activas, listar historial, cancelar
+- `asistencia`: registro de check-in en ventana configurable
 - `metricas`: panel semanal de administración
 - `configuracion`: reglas operativas obtenidas desde BD
 
@@ -48,14 +49,17 @@ Claves relevantes:
 - `max_reservas_por_dia`
 - `anticipacion_reserva_min`
 - `anticipacion_cancelacion_min`
+- `ventana_checkin_min`
+- `umbral_noshow`
 
 Comportamientos:
 
 - creación de reserva solo antes de la ventana de anticipación
 - cancelación solo antes de la ventana de cancelación
+- check-in dentro de ventana configurable (antes/después del inicio)
 - máximo de reservas activas por usuario
 - máximo de reservas activas por día
-- historial separado (canceladas o ya pasadas)
+- historial separado (canceladas, completadas o ya pasadas)
 
 ## 7) Endpoints principales
 
@@ -65,6 +69,7 @@ Comportamientos:
 - `GET /api/reservas/historial`
 - `POST /api/reservas`
 - `DELETE /api/reservas/:id`
+- `POST /api/reservas/:id/check-in`
 - `GET /api/metricas/recomendaciones`
 - `GET /api/metricas/resumen?fecha=YYYY-MM-DD`
 - `GET /api/configuracion/reglas-reserva`
@@ -78,6 +83,14 @@ Comportamientos:
 3. Valida suspensión, cupo, límites, día y ventana de tiempo.
 4. Ejecuta transacción: decrementa cupo y crea reserva activa.
 5. Frontend invalida cachés y actualiza vistas.
+
+### Flujo de check-in
+
+1. Usuario (o admin) solicita check-in sobre una reserva activa.
+2. Backend valida existencia, propiedad (o rol admin), estado activa y ventana de tiempo.
+3. Lee `ventana_checkin_min` de `configuracion`.
+4. Transacción: crea registro en `Asistencia` con `resultado: presente` y marca reserva como `completada`.
+5. Si ya hay check-in registrado o la reserva no está activa, retorna error 400.
 
 ### Flujo de cancelación
 
