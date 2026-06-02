@@ -51,6 +51,11 @@ async function main() {
         valor: '15',
         descripcion: 'Minutos desde inicio del turno para hacer check-in',
       },
+      {
+        clave: 'dias_suspension_por_noshow',
+        valor: '7',
+        descripcion: 'Dias de suspension automatica por alcanzar umbral de no_shows',
+      },
     ],
   });
 
