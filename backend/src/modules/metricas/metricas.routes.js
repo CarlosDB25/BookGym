@@ -3,6 +3,72 @@ const controller = require('./metricas.controller');
 const { verificarToken } = require('../../shared/middlewares/auth.middleware');
 const { soloAdmin } = require('../../shared/middlewares/roles.middleware');
 
+/**
+ * @openapi
+ * /api/metricas/recomendaciones:
+ *   get:
+ *     tags:
+ *       - Metricas
+ *     summary: Obtener recomendaciones de franjas con menor saturacion historica
+ *     description: Endpoint para estudiantes. Retorna franjas ordenadas de menor a mayor saturacion historica, calculada sobre los ultimos 90 dias, excluyendo reservas canceladas. Cada franja se clasifica como 'pico' (>80% ocupacion) o 'valle' (<=80%).
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de franjas recomendadas ordenadas por saturacion ascendente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   dia:
+ *                     type: string
+ *                     enum: [lunes, martes, miercoles, jueves, viernes]
+ *                     example: martes
+ *                   horaInicio:
+ *                     type: string
+ *                     example: "14:00"
+ *                   saturacion:
+ *                     type: integer
+ *                     example: 12
+ *                   clasificacion:
+ *                     type: string
+ *                     enum: [pico, valle]
+ *                     example: valle
+ *                   ocurrencias:
+ *                     type: integer
+ *                     example: 10
+ *             examples:
+ *               ok:
+ *                 value:
+ *                   - dia: martes
+ *                     horaInicio: "14:00"
+ *                     saturacion: 12
+ *                     clasificacion: valle
+ *                     ocurrencias: 10
+ *                   - dia: jueves
+ *                     horaInicio: "09:00"
+ *                     saturacion: 25
+ *                     clasificacion: valle
+ *                     ocurrencias: 8
+ *                   - dia: lunes
+ *                     horaInicio: "18:00"
+ *                     saturacion: 85
+ *                     clasificacion: pico
+ *                     ocurrencias: 12
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         description: Error inesperado del servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+router.get('/recomendaciones', verificarToken, controller.recomendaciones);
+
 router.use(verificarToken, soloAdmin);
 /**
  * @openapi

@@ -1,6 +1,6 @@
 # Backend BookGym
 
-API REST del prototipo de reservas de gimnasio universitario.
+API REST sistema de reservas de gimnasio universitario.
 
 ## 1) Stack técnico
 
@@ -65,6 +65,7 @@ Comportamientos:
 - `GET /api/reservas/historial`
 - `POST /api/reservas`
 - `DELETE /api/reservas/:id`
+- `GET /api/metricas/recomendaciones`
 - `GET /api/metricas/resumen?fecha=YYYY-MM-DD`
 - `GET /api/configuracion/reglas-reserva`
 
@@ -84,6 +85,15 @@ Comportamientos:
 2. Backend valida propiedad de reserva y ventana de cancelación.
 3. Transacción: estado cancelada + incremento de cupo.
 4. Reserva se mueve a historial en lecturas posteriores.
+
+### Flujo de recomendaciones
+
+1. Estudiante autenticado solicita recomendaciones.
+2. Backend consulta franjas pasadas (últimos 90 días) con reservas no canceladas.
+3. Agrupa por día de semana y hora de inicio.
+4. Calcula porcentaje de ocupación histórica por grupo.
+5. Clasifica como `pico` (>80%) o `valle` (≤80%).
+6. Retorna lista ordenada de menor a mayor saturación.
 
 ### Flujo de métricas admin
 

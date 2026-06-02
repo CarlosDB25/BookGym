@@ -30,6 +30,58 @@ function inicioFranjaBogota(fechaDate, horaInicio) {
   return new Date(`${y}-${m}-${d}T${horaInicio}:00-05:00`);
 }
 
+async function recomendaciones() {
+  const ahora = new Date();
+  const inicio = new Date(ahora);
+  inicio.setDate(inicio.getDate() - 90);
+
+  const franjas = await prisma.franja.findMany({
+    where: { fecha: { gte: inicio, lt: ahora } },
+    include: {
+      plantilla: true,
+      reservas: {
+        where: { estado: { not: 'cancelada' } },
+        select: { id: true },
+      },
+    },
+  });
+
+  const grupos = {};
+
+  for (const f of franjas) {
+    const key = `${f.plantilla.diaSemana}_${f.plantilla.horaInicio}`;
+    if (!grupos[key]) {
+      grupos[key] = {
+        dia: f.plantilla.diaSemana,
+        horaInicio: f.plantilla.horaInicio,
+        totalCapacidad: 0,
+        totalOcupadas: 0,
+        ocurrencias: 0,
+      };
+    }
+    grupos[key].totalCapacidad += f.plantilla.capacidadMaxima;
+    grupos[key].totalOcupadas += f.reservas.length;
+    grupos[key].ocurrencias += 1;
+  }
+
+  const resultados = Object.values(grupos).map((g) => {
+    const saturacion = g.totalCapacidad > 0
+      ? Math.round((g.totalOcupadas / g.totalCapacidad) * 100)
+      : 0;
+    return {
+      dia: g.dia,
+      horaInicio: g.horaInicio,
+      saturacion,
+      clasificacion: saturacion > 80 ? 'pico' : 'valle',
+      ocurrencias: g.ocurrencias,
+    };
+  });
+
+  resultados.sort((a, b) => a.saturacion - b.saturacion);
+
+  return resultados;
+}
+
 async function resumen(fecha) {
   const minutosAnticipacionReserva = await leerConfigConDefault(
     'anticipacion_reserva_min',
@@ -90,4 +142,4 @@ async function resumen(fecha) {
   };
 }
 
-module.exports = { resumen };
+module.exports = { resumen, recomendaciones };
