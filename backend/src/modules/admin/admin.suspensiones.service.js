@@ -83,7 +83,7 @@ async function levantarSuspension(id, idAdmin) {
   const actualizada = await prisma.suspension.update({
     where: { id },
     data: { activa: false, levantadaPor: idAdmin },
-    include: { usuario: true },
+    include: { usuario: { select: { idInstitucional: true } } },
   });
 
   return {
