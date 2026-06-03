@@ -249,7 +249,9 @@ async function resumen(fecha) {
   }
 
   const vigentes = filtrarVigentes(franjas);
-  const vigentesAnteriores = filtrarVigentes(franjasAnteriores);
+  const ahoraSemanaAnterior = new Date(ahora);
+  ahoraSemanaAnterior.setDate(ahoraSemanaAnterior.getDate() - 7);
+  const vigentesAnteriores = filtrarVigentes(franjasAnteriores, ahoraSemanaAnterior);
   const actual = calcularMetricas(vigentes);
   const anterior = calcularMetricas(vigentesAnteriores);
   const diffOcupacion = actual.ocupacion - anterior.ocupacion;
