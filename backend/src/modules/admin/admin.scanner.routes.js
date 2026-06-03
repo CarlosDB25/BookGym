@@ -141,5 +141,6 @@ router.use(verificarToken, soloAdmin);
  *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.get('/verificar/:cedula', controller.verificar);
+router.post('/checkin/:idReserva', controller.checkin);
 
 module.exports = router;

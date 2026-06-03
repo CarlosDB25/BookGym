@@ -118,4 +118,39 @@ async function verificarEstudiante(cedula) {
   };
 }
 
-module.exports = { verificarEstudiante };
+async function registrarCheckin(idReserva, registradoPor) {
+  const reserva = await prisma.reserva.findUnique({
+    where: { id: idReserva },
+    include: { asistencia: { select: { id: true } } },
+  });
+
+  if (!reserva) {
+    const error = new Error('Reserva no encontrada');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (reserva.estado !== 'activa') {
+    const error = new Error('La reserva no esta activa');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (reserva.asistencia) {
+    const error = new Error('El check-in ya fue registrado para esta reserva');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  await prisma.asistencia.create({
+    data: {
+      idReserva: reserva.id,
+      registradoPor,
+      resultado: 'presente',
+    },
+  });
+
+  return { mensaje: 'Check-in registrado exitosamente' };
+}
+
+module.exports = { verificarEstudiante, registrarCheckin };

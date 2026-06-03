@@ -82,8 +82,17 @@ Requisitos:
 
 Usuarios demo:
 
-- `EST001 / password123`
-- `ADM001 / password123`
+| Usuario | Perfil | Password |
+|---------|--------|----------|
+| `EST001` | El cumplido — historial limpio | `password123` |
+| `EST002` | El infractor — 3 no-shows, suspendido | `password123` |
+| `EST003` | El suspendido — suspension manual activa | `password123` |
+| `EST004` | El puntual — 8 check-ins historicos | `password123` |
+| `EST005` | El indeciso — 4 cancelaciones | `password123` |
+| `EST006` | El frecuente — 10 check-ins | `password123` |
+| `EST007` | El nuevo — sin historial | `password123` |
+| `1103100844` | Dev — 1 historico + 1 activa semanal | `password123` |
+| `ADM001` | Administrador | `password123` |
 
 ## 5) Swagger y ubicación exacta
 
@@ -97,6 +106,7 @@ Swagger está alojado dentro del backend Express (no en servicio aparte).
   - `backend/src/modules/reservas/reservas.routes.js`
   - `backend/src/modules/metricas/metricas.routes.js`
   - `backend/src/modules/configuracion/configuracion.routes.js`
+  - `backend/src/modules/admin/admin.scanner.routes.js`
 
 Rutas:
 
@@ -104,6 +114,21 @@ Rutas:
 - Local JSON: `http://localhost:3000/api/docs.json`
 - Producción UI: `https://bookgym-production.up.railway.app/api/docs`
 - Producción JSON: `https://bookgym-production.up.railway.app/api/docs.json`
+
+## 5b) Scanner de ingreso (Admin)
+
+El endpoint `GET /api/admin/scanner/verificar/:cedula` permite al administrador escanear la cedula de un estudiante (via codigo de barras o ingreso manual) y conocer su estado operativo en tiempo real.
+
+**Respuestas posibles:**
+
+| Estado | Significado | Accion recomendada |
+|--------|------------|-------------------|
+| `SUSPENDIDO` | El estudiante tiene una suspension activa | Bloquear ingreso |
+| `RESERVA_ENCONTRADA` | Reserva activa dentro de ventana de check-in | Permitir ingreso |
+| `SIN_RESERVA` | No tiene reserva para la franja actual | Requiere ingreso manual/sobrecupo |
+
+- La ventana de check-in se lee desde `configuracion.ventana_checkin_min` (15 min antes/despues del inicio).
+- La hora actual se calcula en zona `America/Bogota` (UTC-5).
 
 ## 6) Despliegue Railway
 

@@ -1,19 +1,25 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { Logo } from '../components/shared/Logo'
-import { IconLogIn, IconUser, IconLock, IconAlertTriangle } from '../components/shared/Icons'
+import { IconLogIn, IconUser, IconLock, IconAlertTriangle, IconCheck } from '../components/shared/Icons'
 
 export function Login({ onLogin }) {
   const [idInstitucional, setIdInstitucional] = useState('EST001')
   const [password, setPassword] = useState('password123')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [aceptoTerminos, setAceptoTerminos] = useState(
+    () => localStorage.getItem('terminosAceptados') === 'true'
+  )
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!aceptoTerminos) return
     setError('')
     setLoading(true)
     try {
+      localStorage.setItem('terminosAceptados', 'true')
       await onLogin(idInstitucional, password)
     } catch (err) {
       setError(err?.response?.data?.error || 'Credenciales inválidas')
@@ -85,10 +91,33 @@ export function Login({ onLogin }) {
               </div>
             )}
 
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 transition hover:bg-slate-100">
+              <div
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${
+                  aceptoTerminos
+                    ? 'border-primary bg-primary text-white'
+                    : 'border-slate-300 bg-white'
+                }`}
+                onClick={() => setAceptoTerminos(!aceptoTerminos)}
+              >
+                {aceptoTerminos && <IconCheck className="h-3 w-3" />}
+              </div>
+              <span className="text-xs leading-relaxed text-slate-600">
+                Acepto los{' '}
+                <Link to="/terminos" className="font-medium text-primary underline hover:text-primary-700">
+                  Términos y Condiciones
+                </Link>{' '}
+                y la{' '}
+                <Link to="/privacidad" className="font-medium text-primary underline hover:text-primary-700">
+                  Política de Privacidad
+                </Link>
+              </span>
+            </label>
+
             <button
               type="submit"
-              disabled={loading}
-              className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-60"
+              disabled={loading || !aceptoTerminos}
+              className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
             >
               {loading ? 'Ingresando...' : 'Ingresar'}
             </button>

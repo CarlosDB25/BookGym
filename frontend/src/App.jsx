@@ -5,6 +5,8 @@ import { StudentMobileLayout } from './layouts/StudentMobileLayout'
 import { AdminDesktopLayout } from './layouts/AdminDesktopLayout'
 
 import { Login } from './pages/Login'
+import { TerminosCondiciones } from './pages/TerminosCondiciones'
+import { PoliticaPrivacidad } from './pages/PoliticaPrivacidad'
 import { HomeRecomendaciones } from './pages/student/HomeRecomendaciones'
 import { ExploradorFranjas } from './pages/student/ExploradorFranjas'
 import { MisCupos } from './pages/student/MisCupos'
@@ -62,6 +64,8 @@ function App() {
     return (
       <Routes>
         <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="/terminos" element={<TerminosCondiciones />} />
+        <Route path="/privacidad" element={<PoliticaPrivacidad />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     )

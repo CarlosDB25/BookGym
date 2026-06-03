@@ -32,18 +32,21 @@ export function ScannerHub({ onNotice }) {
     setCedula(documento)
     setLoading(true)
     try {
-      const { data } = await api.get(`/reservas?documento=${documento}`)
-      if (data.suspendido) {
+      const { data } = await api.get(`/admin/scanner/verificar/${encodeURIComponent(documento)}`)
+      if (data.estado === 'SUSPENDIDO') {
+        setStudentData(data)
         setScenario(SCENARIO.SUSPENDED)
+      } else if (data.estado === 'RESERVA_ENCONTRADA') {
         setStudentData(data)
-      } else if (data.reservaActiva) {
         setScenario(SCENARIO.VALID)
-        setStudentData(data)
       } else {
-        setScenario(SCENARIO.NO_RESERVATION)
         setStudentData(data)
+        setScenario(SCENARIO.NO_RESERVATION)
       }
-    } catch {
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        onNotice?.('error', 'Estudiante no encontrado')
+      }
       setScenario(SCENARIO.IDLE)
       setStudentData(null)
     } finally {
@@ -52,9 +55,9 @@ export function ScannerHub({ onNotice }) {
   }
 
   async function handleCheckin() {
-    if (!studentData?.reservaActiva?.id) return
+    if (!studentData?.reserva?.id) return
     try {
-      await api.post(`/reservas/${studentData.reservaActiva.id}/check-in`)
+      await api.post(`/admin/scanner/checkin/${studentData.reserva.id}`)
       onNotice?.('success', `Check-in registrado para ${studentName}`)
       setScenario(SCENARIO.IDLE)
       setStudentData(null)
@@ -183,13 +186,13 @@ export function ScannerHub({ onNotice }) {
               </div>
             </div>
 
-            {studentData.reservaActiva && (
+            {studentData.reserva && (
               <div className="rounded-xl bg-success-50 p-4">
                 <p className="text-sm font-medium text-success-800">
-                  {studentData.reservaActiva.franja?.horaInicio} - {studentData.reservaActiva.franja?.horaFin}
+                  {studentData.reserva.franja?.horaInicio} - {studentData.reserva.franja?.horaFin}
                 </p>
                 <p className="text-xs text-success-700">
-                  {studentData.reservaActiva.franja?.diaSemana}
+                  {studentData.reserva.franja?.diaSemana}
                 </p>
               </div>
             )}
@@ -220,7 +223,7 @@ export function ScannerHub({ onNotice }) {
               </div>
             </div>
             <div className="rounded-xl bg-white p-4 text-sm text-danger-700">
-              {studentData.motivoSuspension || 'Suspensión automática por acumulación de inasistencias'}
+              {studentData.suspension?.motivo || 'Suspensión automática por acumulación de inasistencias'}
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-danger-100 px-4 py-3 text-sm font-medium text-danger-700">
               <IconXCircle className="h-5 w-5" />

@@ -18,7 +18,7 @@ API REST sistema de reservas de gimnasio universitario.
 - `asistencia`: registro de check-in en ventana configurable
 - `metricas`: panel semanal de administración
 - `configuracion`: reglas operativas obtenidas desde BD
-- `admin`: gestion de suspensiones y configuracion operativa (solo administradores)
+- `admin`: gestion de suspensiones, configuracion operativa y **scanner de ingreso** (solo administradores)
 
 ## 3) Variables de entorno
 
@@ -81,6 +81,7 @@ Comportamientos:
 - `POST /api/admin/suspensiones`
 - `DELETE /api/admin/suspensiones/:id`
 - `PUT /api/admin/configuracion/reglas-reserva`
+- `GET /api/admin/scanner/verificar/:cedula`
 
 ## 8) Flujo end-to-end backend
 
@@ -148,6 +149,20 @@ Comportamientos:
 3. Valida que las claves sean validas y los valores enteros positivos.
 4. Upsert en tabla `configuracion` para cada clave.
 5. Retorna la configuracion completa actualizada (las 7 claves).
+
+### Flujo de scanner de ingreso
+
+Endpoint pensado para el lector de codigo de barras de la recepcion del gimnasio. Recibe la cedula escaneada y retorna el estado operativo del estudiante en tiempo real.
+
+1. Admin autenticado envia `GET /api/admin/scanner/verificar/:cedula`.
+2. Backend busca al usuario por `idInstitucional`.
+3. **Si no existe**: HTTP 404 con mensaje claro.
+4. **Si existe y tiene suspension activa** (`Suspension.activa=true` y `fechaFin > now`): HTTP 200 con `{ estado: "SUSPENDIDO", usuario, suspension }`.
+5. **Si existe y no esta suspendido**: consulta `ventana_checkin_min` de `configuracion` y busca una reserva activa para HOY (zona horaria `America/Bogota`) cuya franja este dentro de la ventana de check-in.
+6. **Si encuentra reserva**: HTTP 200 con `{ estado: "RESERVA_ENCONTRADA", usuario, reserva }`.
+7. **Si no hay reserva vigente**: HTTP 200 con `{ estado: "SIN_RESERVA", usuario, mensaje }`.
+
+La hora actual se calcula con offset `-05:00` (Colombia, sin horario de verano) para evitar depender de la zona horaria del servidor en la nube.
 
 ## 9) Swagger
 
