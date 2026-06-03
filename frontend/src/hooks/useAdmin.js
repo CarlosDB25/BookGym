@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../config/axios'
 
-export function useAdminSuspensiones(activasOnly = false) {
+export function useAdminSuspensiones() {
   return useQuery({
-    queryKey: ['admin-suspensiones', activasOnly],
+    queryKey: ['admin-suspensiones'],
     queryFn: async () => {
-      const params = activasOnly ? '?activas=true' : ''
-      const { data } = await api.get(`/admin/suspensiones${params}`)
+      const { data } = await api.get('/admin/suspensiones/usuarios')
       return data
     },
     refetchInterval: 15000,

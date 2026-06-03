@@ -97,4 +97,39 @@ async function levantarSuspension(id, idAdmin) {
    };
  }
  
- module.exports = { listarSuspensiones, crearSuspension, levantarSuspension };
+ async function listarUsuarios() {
+  const usuarios = await prisma.usuario.findMany({
+    where: { rol: 'estudiante' },
+    include: {
+      suspensiones: {
+        where: { activa: true, fechaFin: { gte: new Date() } },
+        select: { id: true, fechaInicio: true, fechaFin: true, motivo: true, activa: true },
+        take: 1,
+      },
+      reservas: {
+        where: { estado: { in: ['activa', 'no_show', 'completada'] } },
+        select: { estado: true, asistencia: { select: { resultado: true } } },
+      },
+    },
+    orderBy: { idInstitucional: 'asc' },
+  });
+
+  return usuarios.map((u) => {
+    const total = u.reservas.length;
+    const noShows = u.reservas.filter((r) => r.estado === 'no_show' || (r.estado === 'activa' && !r.asistencia)).length;
+    const suspensionActiva = u.suspensiones.length > 0 ? u.suspensiones[0] : null;
+
+    return {
+      usuarioId: u.idInstitucional,
+      usuarioNombre: u.idInstitucional,
+      programa: '—',
+      noshowCount: total > 0 ? Math.round((noShows / total) * 10) : 0,
+      activa: suspensionActiva?.activa || false,
+      suspension: suspensionActiva
+        ? { id: suspensionActiva.id, fechaInicio: suspensionActiva.fechaInicio, fechaFin: suspensionActiva.fechaFin, motivo: suspensionActiva.motivo }
+        : null,
+    };
+  });
+}
+
+module.exports = { listarSuspensiones, crearSuspension, levantarSuspension, listarUsuarios };

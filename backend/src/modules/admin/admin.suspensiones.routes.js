@@ -60,6 +60,7 @@ router.use(verificarToken, soloAdmin);
  *         description: Error interno del servidor
  */
 router.get('/', controller.listar);
+router.get('/usuarios', controller.listarUsuarios);
 
 /**
  * @openapi

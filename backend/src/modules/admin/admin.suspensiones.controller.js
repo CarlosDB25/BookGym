@@ -77,4 +77,14 @@ async function levantar(req, res) {
   }
 }
 
-module.exports = { listar, crear, levantar };
+async function listarUsuarios(req, res) {
+  try {
+    const usuarios = await service.listarUsuarios();
+    return res.json(usuarios);
+  } catch (error) {
+    console.error('Error listarUsuarios:', error.message);
+    return res.status(500).json({ error: 'No fue posible listar los usuarios' });
+  }
+}
+
+module.exports = { listar, crear, levantar, listarUsuarios };
