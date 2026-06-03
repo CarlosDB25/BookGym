@@ -5,10 +5,7 @@
   "scripts": {
     "dev": "node src/server.js",
     "start": "node src/server.js",
-    "seed": "node prisma/seed.js",
-    "test": "jest tests/unit --forceExit --detectOpenHandles",
-    "test:noshow": "jest tests/unit/noshow.test.js --forceExit --detectOpenHandles",
-    "test:concurrency": "jest tests/concurrency --forceExit --detectOpenHandles --testTimeout=60000"
+    "seed": "node prisma/seed.js"
   },
   "keywords": [],
   "author": "",
@@ -25,9 +22,5 @@
     "prisma": "^5.22.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
-  },
-  "devDependencies": {
-    "jest": "^29.0.0",
-    "supertest": "^7.0.0"
   }
 }

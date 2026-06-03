@@ -18,6 +18,7 @@ API REST sistema de reservas de gimnasio universitario.
 - `asistencia`: registro de check-in en ventana configurable
 - `metricas`: panel semanal de administraci贸n
 - `configuracion`: reglas operativas obtenidas desde BD
+- `admin`: gestion de suspensiones y configuracion operativa (solo administradores)
 
 ## 3) Variables de entorno
 
@@ -51,6 +52,7 @@ Claves relevantes:
 - `anticipacion_cancelacion_min`
 - `ventana_checkin_min`
 - `umbral_noshow`
+- `dias_suspension_por_noshow`
 
 Comportamientos:
 
@@ -74,6 +76,10 @@ Comportamientos:
 - `GET /api/metricas/resumen?fecha=YYYY-MM-DD`
 - `GET /api/metricas/analisis?tipo=semana|dia|mes&fecha=YYYY-MM-DD`
 - `GET /api/configuracion/reglas-reserva`
+- `GET /api/admin/suspensiones`
+- `POST /api/admin/suspensiones`
+- `DELETE /api/admin/suspensiones/:id`
+- `PUT /api/admin/configuracion/reglas-reserva`
 
 ## 8) Flujo end-to-end backend
 
@@ -123,6 +129,22 @@ Comportamientos:
 7. Excluye canceladas por definici贸n de conteo activo.
 8. Timeout de 25s; an谩lisis retorna 504 si excede (para rangos grandes).
 
+### Flujo de suspensiones admin
+
+1. Admin autenticado solicita listar, crear o levantar suspensiones.
+2. Backend valida token JWT y rol `administrador`.
+3. **Listar**: retorna todas las suspensiones (filtro opcional por activas).
+4. **Crear**: valida existencia de usuario, ausencia de suspension activa duplicada y coherencia de fechas.
+5. **Levantar**: marca suspension como inactiva y registra el admin que ejecuto la accion.
+
+### Flujo de configuracion admin
+
+1. Admin autenticado envia PUT con una o mas claves a actualizar.
+2. Backend valida token JWT y rol `administrador`.
+3. Valida que las claves sean validas y los valores enteros positivos.
+4. Upsert en tabla `configuracion` para cada clave.
+5. Retorna la configuracion completa actualizada (las 7 claves).
+
 ## 9) Swagger
 
 Swagger est谩 integrado en Express.
@@ -157,7 +179,7 @@ Configuraci贸n de pool en DATABASE_URL:
 - `GET /health`: validaci贸n de disponibilidad del servicio
 - `GET /api/configuracion/reglas-reserva`: diagn贸stico r谩pido de reglas activas
 
-## 11) Motor de No-Show
+## 12) Motor de No-Show
 
 - Entry point: `src/scheduler/noshow.scheduler.js` registra el cron */15 * * * *.
 - Procesador: `src/scheduler/noshow.processor.js` contiene `procesarNoShows()` (idempotente, exportable para tests).
@@ -165,4 +187,4 @@ Configuraci贸n de pool en DATABASE_URL:
 - Crea `Suspension` con `dias_suspension_por_noshow` desde `configuracion` cuando se acumula `umbral_noshow`.
 - Cancela en cascada las reservas activas del usuario suspendido (transaccional, libera cupos).
 - Logs en consola con prefijo `[NoShow]` (cambios de estado) y `[AUDIT][NoShow]` (suspensiones aplicadas).
-- Pruebas: `npm run test:noshow` (6 tests: cambio de estado, idempotencia, franjas no vencidas, cascada de suspensi髇, no duplicar suspensi髇, etc).
+- Pruebas: `npm run test:noshow` (6 tests: cambio de estado, idempotencia, franjas no vencidas, cascada de suspensi锟絥, no duplicar suspensi锟絥, etc).
