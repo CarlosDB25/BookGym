@@ -46,6 +46,7 @@ export function Toast({ notice, onClose, duration = 4000 }) {
     <AnimatePresence>
       {visible && (
         <motion.div
+          key={notice.message}
           className={`fixed right-4 top-4 z-50 flex max-w-sm items-start gap-3 rounded-2xl border px-4 py-3 shadow-elevated ${s.bg}`}
           initial={{ opacity: 0, x: 20, scale: 0.95 }}
           animate={{ opacity: 1, x: 0, scale: 1 }}

@@ -1,8 +1,17 @@
-import { useEffect, useState } from 'react'
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { IconLayoutDashboard, IconScan, IconUsers, IconSettings, IconLogOut } from '../components/shared/Icons'
 import { Logo } from '../components/shared/Logo'
 import { formatClock } from '../utils/time'
+
+function ClockWidget() {
+  const [clock, setClock] = useState(formatClock())
+  useEffect(() => {
+    const interval = setInterval(() => setClock(formatClock()), 1000)
+    return () => clearInterval(interval)
+  }, [])
+  return <div className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-xs font-medium text-slate-600">{clock}</div>
+}
 
 const sidebarItems = [
   { path: '/admin', label: 'Dashboard', icon: IconLayoutDashboard },
@@ -13,12 +22,6 @@ const sidebarItems = [
 
 export function AdminDesktopLayout({ usuario, onLogout }) {
   const location = useLocation()
-  const [clock, setClock] = useState(formatClock())
-
-  useEffect(() => {
-    const interval = setInterval(() => setClock(formatClock()), 1000)
-    return () => clearInterval(interval)
-  }, [])
 
   const breadcrumb = sidebarItems.find((s) => s.path === location.pathname)?.label || 'Panel'
 
@@ -79,9 +82,7 @@ export function AdminDesktopLayout({ usuario, onLogout }) {
             <span className="font-semibold text-slate-800">{breadcrumb}</span>
           </div>
           <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-xs font-medium text-slate-600">
-              {clock}
-            </div>
+            <ClockWidget />
           </div>
         </header>
 

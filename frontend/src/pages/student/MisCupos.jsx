@@ -147,7 +147,7 @@ export function MisCupos({ onNotice }) {
         <>
           {activasConEstado.length === 0 ? (
             <EmptyState
-              icon={Ticket}
+              icon={IconTicket}
               title="Sin reservas activas"
               message="Reserva un horario desde la sección Explorar."
             />
@@ -192,7 +192,7 @@ export function MisCupos({ onNotice }) {
                     )}
                     {!reserva.puedeCancelar && !reserva.enVentanaCheckin && (
                       <span className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-4 py-2 text-xs font-medium text-slate-400">
-                        <Clock className="h-3 w-3" />
+                        <IconClock className="h-3 w-3" />
                         Ventana de cancelación cerrada
                       </span>
                     )}
@@ -208,7 +208,7 @@ export function MisCupos({ onNotice }) {
         <>
           {historial.length === 0 ? (
             <EmptyState
-              icon={History}
+              icon={IconHistory}
               title="Sin historial"
               message="Tus reservas pasadas aparecerán aquí."
             />
@@ -227,9 +227,9 @@ export function MisCupos({ onNotice }) {
                   completada: IconCheckCircle,
                   cancelada: IconXCircle,
                   no_show: IconAlertTriangle,
-                  activa: Clock,
+                  activa: IconClock,
                 }
-                const Icon = IconMap[estado] || Clock
+                const Icon = IconMap[estado] || IconClock
 
                 return (
                   <div

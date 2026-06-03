@@ -23,7 +23,15 @@ export function StudentMobileLayout({ usuario, onLogout }) {
               Book<span className="font-light">Gym</span>
             </span>
           </div>
-          <span className="text-xs font-medium text-slate-500">{usuario?.nombre}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-medium text-slate-500">{usuario?.nombre}</span>
+            <button
+              onClick={onLogout}
+              className="rounded-lg bg-danger-50 px-2.5 py-1 text-xs font-semibold text-danger-600 transition hover:bg-danger-100"
+            >
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
