@@ -1,105 +1,73 @@
-const TZ = 'America/Bogota';
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+import 'dayjs/locale/es'
 
-function getPartsInBogota(date = new Date()) {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: TZ,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  });
+dayjs.extend(utc)
+dayjs.extend(timezone)
+dayjs.locale('es')
 
-  const parts = formatter.formatToParts(date);
-  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+const TZ = 'America/Bogota'
+dayjs.tz.setDefault(TZ)
 
-  return {
-    year: map.year,
-    month: map.month,
-    day: map.day,
-    hour: map.hour,
-    minute: map.minute,
-    second: map.second,
-  };
+export function now() {
+  return dayjs().tz(TZ)
 }
 
-export function getBogotaTodayYMD() {
-  const p = getPartsInBogota();
-  return `${p.year}-${p.month}-${p.day}`;
+export function todayYMD() {
+  return now().format('YYYY-MM-DD')
 }
 
-export function getBogotaNowMillis() {
-  const p = getPartsInBogota();
-  return Date.parse(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}-05:00`);
+export function nowMillis() {
+  return now().valueOf()
+}
+
+export function parseSlotMillis(dateISO, hour) {
+  const ymd = dateISO.split('T')[0]
+  return dayjs.tz(`${ymd} ${hour}`, 'YYYY-MM-DD HH:mm', TZ).valueOf()
 }
 
 export function mondayFromYMD(ymd) {
-  const [y, m, d] = ymd.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-  const day = date.getUTCDay();
-  const adjust = day === 0 ? -6 : 1 - day;
-  date.setUTCDate(date.getUTCDate() + adjust);
-
-  const yy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-
-  return `${yy}-${mm}-${dd}`;
+  const d = dayjs.tz(ymd, 'YYYY-MM-DD', TZ)
+  const day = d.day()
+  const diff = day === 0 ? -6 : 1 - day
+  return d.add(diff, 'day').format('YYYY-MM-DD')
 }
 
-export function slotMillisBogota(dateISO, hour) {
-  const ymd = dateISO.split('T')[0];
-  return Date.parse(`${ymd}T${hour}:00-05:00`);
+export function formatDate(iso) {
+  const ymd = iso.split('T')[0]
+  return dayjs.tz(ymd, 'YYYY-MM-DD', TZ).format('dddd D MMM')
 }
 
-export function formatDateBogota(dateISO) {
-  const ymd = dateISO.split('T')[0];
-  const [y, m, d] = ymd.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d));
-
-  return new Intl.DateTimeFormat('es-CO', {
-    timeZone: TZ,
-    weekday: 'long',
-    day: '2-digit',
-    month: '2-digit',
-  }).format(date);
+export function formatDayHeader(iso) {
+  const ymd = iso.split('T')[0]
+  return dayjs.tz(ymd, 'YYYY-MM-DD', TZ).format('ddd D/M')
 }
 
-export function weekdayIndexFromDiaSemana(diaSemana) {
+export function weekdayIndex(dayName) {
   const map = {
-    lunes: 0,
-    martes: 1,
-    miercoles: 2,
-    jueves: 3,
-    viernes: 4,
-    sabado: 5,
-    domingo: 6,
-  };
-
-  return map[diaSemana] ?? 0;
+    lunes: 0, martes: 1, miercoles: 2, jueves: 3,
+    viernes: 4, sabado: 5, domingo: 6,
+  }
+  return map[dayName] ?? 0
 }
 
-export function currentWeekdayIndexBogota() {
-  const names = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-  const name = new Intl.DateTimeFormat('es-CO', {
-    timeZone: TZ,
-    weekday: 'long',
-  })
-    .format(new Date())
-    .toLowerCase();
+export function currentWeekdayIndex() {
+  return now().day()
+}
 
-  const weekday = names.find((n) => name.includes(n)) || 'lunes';
-  const map = {
-    lunes: 0,
-    martes: 1,
-    miercoles: 2,
-    jueves: 3,
-    viernes: 4,
-    sabado: 5,
-    domingo: 6,
-  };
+export function isWithinWindow(eventStartMillis, windowMinutes) {
+  return nowMillis() < eventStartMillis - windowMinutes * 60 * 1000
+}
 
-  return map[weekday];
+export function minutesUntil(eventStartMillis) {
+  return Math.round((eventStartMillis - nowMillis()) / 60000)
+}
+
+export function formatTimeAgo(millis) {
+  return dayjs(millis).format('HH:mm:ss')
+}
+
+export function formatClock() {
+  return now().format('HH:mm:ss')
 }

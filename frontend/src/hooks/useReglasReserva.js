@@ -1,14 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
-import api from '../api/client';
+import { useQuery } from '@tanstack/react-query'
+import api from '../config/axios'
 
 export function useReglasReserva() {
   return useQuery({
     queryKey: ['reglas-reserva'],
     queryFn: async () => {
-      const { data } = await api.get('/configuracion/reglas-reserva');
-      return data;
+      const { data } = await api.get('/configuracion/reglas-reserva')
+      return data
     },
-    refetchInterval: 15000,
-    refetchOnWindowFocus: true,
-  });
+    staleTime: 60000,
+    refetchInterval: 60000,
+  })
 }

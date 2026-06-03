@@ -11,9 +11,16 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.95.2",
+    "@tanstack/react-table": "^8.21.2",
     "axios": "^1.13.6",
+    "dayjs": "^1.11.21",
+    "es-toolkit": "^1.33.0",
+    "framer-motion": "^12.10.5",
+    "html5-qrcode": "^2.3.8",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.16.0",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

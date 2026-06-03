@@ -1,92 +1,108 @@
-import { useEffect, useState } from 'react';
-import { Login } from './pages/Login';
-import { Disponibilidad } from './pages/Disponibilidad';
-import { MisReservas } from './pages/MisReservas';
-import { useAuth } from './hooks/useAuth';
-import { AdminDashboard } from './pages/AdminDashboard';
-import { Toast } from './components/Toast';
-import { Historial } from './pages/Historial';
+import { useState, useCallback } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { useAuth } from './hooks/useAuth'
+import { StudentMobileLayout } from './layouts/StudentMobileLayout'
+import { AdminDesktopLayout } from './layouts/AdminDesktopLayout'
+
+import { Login } from './pages/Login'
+import { HomeRecomendaciones } from './pages/student/HomeRecomendaciones'
+import { ExploradorFranjas } from './pages/student/ExploradorFranjas'
+import { MisCupos } from './pages/student/MisCupos'
+import { Perfil } from './pages/student/Perfil'
+import { DashboardAnalitico } from './pages/admin/DashboardAnalitico'
+import { ScannerHub } from './pages/admin/ScannerHub'
+import { AdminUsuarios } from './pages/admin/AdminUsuarios'
+import { AdminConfig } from './pages/admin/AdminConfig'
+import { Toast } from './components/ui/Toast'
+
+function ProtectedRoute({ children, rol }) {
+  const stored = localStorage.getItem('usuario')
+  const user = stored ? JSON.parse(stored) : null
+  if (!user) return <Navigate to="/login" replace />
+  if (rol && user.rol !== rol) return <Navigate to={user.rol === 'administrador' ? '/admin' : '/home'} replace />
+  return children
+}
+
+function StudentGuard() {
+  const stored = localStorage.getItem('usuario')
+  const user = stored ? JSON.parse(stored) : null
+  if (!user) return <Navigate to="/login" replace />
+  if (user.rol !== 'estudiante') return <Navigate to="/admin" replace />
+  return null
+}
+
+function AdminGuard() {
+  const stored = localStorage.getItem('usuario')
+  const user = stored ? JSON.parse(stored) : null
+  if (!user) return <Navigate to="/login" replace />
+  if (user.rol !== 'administrador') return <Navigate to="/home" replace />
+  return null
+}
 
 function App() {
-  const { usuario, login, logout } = useAuth();
-  const [tab, setTab] = useState('agenda');
-  const [notice, setNotice] = useState(null);
+  const { usuario, login, logout } = useAuth()
+  const [notice, setNotice] = useState(null)
 
-  function showNotice(type, message) {
-    setNotice({ type, message });
-  }
+  const showNotice = useCallback((type, message) => {
+    setNotice({ type, message })
+  }, [])
 
-  function handleLogout() {
-    setNotice(null);
-    logout();
-  }
+  const handleLogin = useCallback(async (id, pw) => {
+    const data = await login(id, pw)
+    const esAdmin = data.rol === 'administrador'
+    window.location.href = esAdmin ? '/admin' : '/home'
+  }, [login])
+
+  const handleLogout = useCallback(() => {
+    logout()
+    window.location.href = '/login'
+  }, [logout])
 
   if (!usuario) {
     return (
-      <main className="mx-auto min-h-screen w-full max-w-6xl px-4 py-16 text-[color:var(--ink)]">
-        <Login onLogin={login} />
-      </main>
-    );
+      <Routes>
+        <Route path="/login" element={<Login onLogin={handleLogin} />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    )
   }
 
-  const esAdmin = usuario.rol === 'administrador';
-
-  useEffect(() => {
-    setTab(esAdmin ? 'panel' : 'agenda');
-  }, [esAdmin]);
+  const esAdmin = usuario.rol === 'administrador'
 
   return (
-    <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-10 text-[color:var(--ink)]">
+    <>
       <Toast notice={notice} onClose={() => setNotice(null)} />
 
-      <header className="surface mb-6 px-6 py-5 fade-in">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <span className="chip">BookGym</span>
-            <h1 className="mt-2 text-2xl font-bold text-[color:var(--ink)]">Reservas institucionales</h1>
-            <p className="mt-1 text-sm text-[color:var(--muted)]">
-              {usuario.id} · {usuario.rol}
-            </p>
-          </div>
+      <Routes>
+        {esAdmin ? (
+          <Route
+            element={
+              <AdminDesktopLayout usuario={usuario} onLogout={handleLogout} />
+            }
+          >
+            <Route path="/admin" element={<DashboardAnalitico onNotice={showNotice} />} />
+            <Route path="/admin/scanner" element={<ScannerHub onNotice={showNotice} />} />
+            <Route path="/admin/usuarios" element={<AdminUsuarios onNotice={showNotice} />} />
+            <Route path="/admin/config" element={<AdminConfig onNotice={showNotice} />} />
+          </Route>
+        ) : (
+          <Route
+            element={
+              <StudentMobileLayout usuario={usuario} onLogout={handleLogout} />
+            }
+          >
+            <Route path="/home" element={<HomeRecomendaciones onNotice={showNotice} />} />
+            <Route path="/explorar" element={<ExploradorFranjas onNotice={showNotice} />} />
+            <Route path="/mis-cupos" element={<MisCupos onNotice={showNotice} />} />
+            <Route path="/perfil" element={<Perfil usuario={usuario} />} />
+          </Route>
+        )}
 
-          <button className="btn-outline rounded-md px-4 py-2 text-sm font-semibold transition" onClick={handleLogout}>
-            Cerrar sesion
-          </button>
-        </div>
-
-        <nav className="mt-5 flex flex-wrap gap-2">
-          {esAdmin ? (
-            <>
-              <button onClick={() => setTab('panel')} className={`tab ${tab === 'panel' ? 'tab-active' : ''}`}>
-                Panel
-              </button>
-              <button onClick={() => setTab('agenda')} className={`tab ${tab === 'agenda' ? 'tab-active' : ''}`}>
-                Agenda
-              </button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => setTab('agenda')} className={`tab ${tab === 'agenda' ? 'tab-active' : ''}`}>
-                Agenda
-              </button>
-              <button onClick={() => setTab('mis-reservas')} className={`tab ${tab === 'mis-reservas' ? 'tab-active' : ''}`}>
-                Mis reservas
-              </button>
-              <button onClick={() => setTab('historial')} className={`tab ${tab === 'historial' ? 'tab-active' : ''}`}>
-                Historial
-              </button>
-            </>
-          )}
-        </nav>
-      </header>
-
-      {esAdmin && tab === 'panel' ? <AdminDashboard /> : null}
-      {esAdmin && tab === 'agenda' ? <Disponibilidad soloLectura onNotice={showNotice} /> : null}
-      {!esAdmin && tab === 'agenda' ? <Disponibilidad onNotice={showNotice} /> : null}
-      {!esAdmin && tab === 'mis-reservas' ? <MisReservas onNotice={showNotice} /> : null}
-      {!esAdmin && tab === 'historial' ? <Historial /> : null}
-    </main>
-  );
+        <Route path="/login" element={<Navigate to={esAdmin ? '/admin' : '/home'} replace />} />
+        <Route path="*" element={<Navigate to={esAdmin ? '/admin' : '/home'} replace />} />
+      </Routes>
+    </>
+  )
 }
 
-export default App;
+export default App

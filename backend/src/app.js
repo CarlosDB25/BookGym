@@ -10,6 +10,7 @@ const metricasRoutes = require('./modules/metricas/metricas.routes');
 const configuracionRoutes = require('./modules/configuracion/configuracion.routes');
 const adminSuspensionesRoutes = require('./modules/admin/admin.suspensiones.routes');
 const adminConfiguracionRoutes = require('./modules/admin/admin.configuracion.routes');
+const adminScannerRoutes = require('./modules/admin/admin.scanner.routes');
 const { setupSwagger } = require('./docs/swagger');
 
 const app = express();
@@ -29,6 +30,7 @@ app.use('/api/metricas', metricasRoutes);
 app.use('/api/configuracion', configuracionRoutes);
 app.use('/api/admin/suspensiones', adminSuspensionesRoutes);
 app.use('/api/admin/configuracion', adminConfiguracionRoutes);
+app.use('/api/admin/scanner', adminScannerRoutes);
 setupSwagger(app);
 
 app.use((err, req, res, next) => {
