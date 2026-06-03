@@ -8,8 +8,9 @@ async function listarSuspensiones(activas) {
 
   const suspensiones = await prisma.suspension.findMany({
     where,
-    include: { usuario: true },
+    include: { usuario: { select: { idInstitucional: true } } },
     orderBy: { fechaInicio: 'desc' },
+  });
   });
 
   return suspensiones.map((s) => ({
