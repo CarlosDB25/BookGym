@@ -16,12 +16,11 @@ async function leerConfig(clave, defecto) {
 }
 
 async function asegurarConfig(clave, valorDefecto, descripcion) {
-  const existe = await prisma.configuracion.findUnique({ where: { clave } });
-  if (!existe) {
-    await prisma.configuracion.create({
-      data: { clave, valor: String(valorDefecto), descripcion },
-    });
-  }
+  await prisma.configuracion.upsert({
+    where: { clave },
+    update: {},
+    create: { clave, valor: String(valorDefecto), descripcion },
+  });
 }
 
 async function cancelarReservasActivasDeUsuario(tx, idUsuario) {
