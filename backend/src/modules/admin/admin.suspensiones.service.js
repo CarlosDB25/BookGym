@@ -25,7 +25,6 @@ async function listarSuspensiones(activas) {
     motivo: s.motivo,
     activa: s.activa,
     levantadaPor: s.levantadaPor,
-    createdAt: s.createdAt,
   }));
 }
 
