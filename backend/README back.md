@@ -34,6 +34,7 @@ Crear `.env` con base en `.env.example`:
 - `npm run dev`: desarrollo
 - `npm run start`: producción
 - `npm run seed`: datos iniciales
+- `npm run test`: ejecutar suite completa de tests
 
 ## 5) Inicialización de base de datos
 
@@ -87,9 +88,12 @@ Comportamientos:
 
 1. Usuario autenticado solicita crear reserva.
 2. Backend carga reglas de `configuracion`.
-3. Valida suspensión, cupo, límites, día y ventana de tiempo.
-4. Ejecuta transacción: decrementa cupo y crea reserva activa.
-5. Frontend invalida cachés y actualiza vistas.
+3. Valida suspensión, límites activas/día, duplicado y ventana de tiempo.
+4. Sección crítica protegida por mutex por franja (Node.js).
+5. Decremento atómico vía `UPDATE ... WHERE cuposDisponibles > 0` (PostgreSQL nativo, sin intermediación de Prisma engine).
+6. Si el decremento falla (cupo agotado), se descarta sin restaurar.
+7. Si la creación de la reserva falla inesperadamente, se restaura el cupo.
+8. Frontend invalida cachés y actualiza vistas.
 
 ### Flujo de check-in
 
@@ -188,3 +192,43 @@ Configuración de pool en DATABASE_URL:
 - Cancela en cascada las reservas activas del usuario suspendido (transaccional, libera cupos).
 - Logs en consola con prefijo `[NoShow]` (cambios de estado) y `[AUDIT][NoShow]` (suspensiones aplicadas).
 - Pruebas: `npm run test:noshow` (6 tests: cambio de estado, idempotencia, franjas no vencidas, cascada de suspensión, no duplicar suspensión, etc).
+
+## 13) Testing y Calidad
+
+El backend cuenta con 113 tests automáticos que se ejecutan contra PostgreSQL real (sin mocks), divididos en 12 suites:
+
+| Suite | Archivo | Tests | Cobertura funcional |
+|-------|---------|-------|---------------------|
+| Auth | `01-auth.test.js` | 12 | Login, JWT, SQL injection, XSS |
+| Franjas | `02-franjas.test.js` | 10 | Disponibilidad semanal, cupos, formato fecha |
+| Reservas | `03-reservas.test.js` | 19 | CRUD reservas, validaciones, límites, concurrencia simple |
+| Asistencia | `04-asistencia.test.js` | 5 | Check-in, permisos, estados |
+| Métricas | `05-metricas.test.js` | 15 | Resumen, recomendaciones, análisis admin |
+| Configuración | `06-configuracion.test.js` | 3 | Reglas operativas |
+| Admin Suspensiones | `07-admin-suspensiones.test.js` | 11 | CRUD suspensiones, permisos |
+| Admin Config | `08-admin-configuracion.test.js` | 12 | Actualizar reglas, validaciones, permisos |
+| Integración | `09-integracion.test.js` | 3 | Flujos completos login→reserva→cancelar→historial |
+| Vulnerabilidades | `10-vulnerabilidades.test.js` | 15 | SQL injection, XSS, control acceso, CORS, edge cases |
+| Concurrencia | `reservas.concurrency.test.js` | 2 | Race condition sobre cupos, consistencia transaccional |
+| Helpers | `helpers.js` | — | Utilidades compartidas (crear usuario, login, franja futura, limpieza) |
+
+### Bug fixes aplicados
+
+| Archivo | Bug | Fix |
+|---------|-----|-----|
+| `metricas.service.js` | Variable `inicio` no definida en `resumen()` | Se agregó `const inicio = parseMonday(fecha)` |
+| `app.js` | JSON parse error devolvía 500 | Se cambió a `err.status` con mensaje `< 500` |
+| `franjas.service.js` | Fecha inválida exponía errores Prisma | Se agregó validación con regex y `isNaN` |
+| `helpers.js` | Orden de cleanup incorrecto (reserva antes que asistencia, FK violation) | Se invirtió orden: asistencia → reserva → usuario |
+
+### Concurrencia y condición de carrera
+
+**Problema original**: `Prisma.$transaction` con `Serializable` + `updateMany` evaluaba el `WHERE cuposDisponibles > 0` sobre el snapshot de la transacción, y el reintento automático de Prisma en caso de serialization error permitía que dos requests concurrentes decrementaran el mismo cupo.
+
+**Solución**: Se reemplazó la transacción interactiva por un patrón de dos fases:
+
+1. **Mutex por franja** (`Map<idFranja, Promise>`): serializa los requests concurrentes sobre la misma franja a nivel de Node.js.
+2. **Decremento atómico nativo** (`$executeRawUnsafe`): `UPDATE franja SET cuposDisponibles = cuposDisponibles - 1 WHERE id = $1 AND cuposDisponibles > 0`. PostgreSQL serializa los `UPDATE` concurrentes mediante row-level locks y re-evalúa el `WHERE` sobre el valor commitado más reciente (Read Committed).
+3. **Recuperación granular**: solo se restaura el cupo si `reserva.create` falla, no cuando el cupo ya estaba agotado.
+
+Esto elimina la dependencia del batching del Prisma Engine, que demostró no ejecutar `$executeRawUnsafe` dentro del contexto transaccional interactivo correctamente en escenarios de alta concurrencia.

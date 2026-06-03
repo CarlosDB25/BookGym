@@ -32,8 +32,12 @@ app.use('/api/admin/configuracion', adminConfiguracionRoutes);
 setupSwagger(app);
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ error: 'Error interno del servidor' });
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) {
+    console.error(err);
+  }
+  const message = status < 500 ? err.message : 'Error interno del servidor';
+  res.status(status).json({ error: message });
 });
 
 module.exports = app;

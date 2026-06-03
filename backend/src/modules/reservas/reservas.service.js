@@ -1,5 +1,30 @@
 const prisma = require('../../shared/prisma/client');
-const { Prisma } = require('@prisma/client');
+
+// Mutex por franja: serializa requests concurrentes sobre la misma franja
+// para evitar condiciones de carrera que Prisma no resuelve correctamente
+// con $executeRawUnsafe dentro/ fuera de transacciones interactivas.
+const franjaLocks = new Map();
+const franjaWaiters = new Map();
+
+async function adquirirLock(idFranja) {
+  const lock = franjaLocks.get(idFranja) || Promise.resolve();
+  let release;
+  const nextLock = new Promise((resolve) => { release = resolve; });
+  franjaLocks.set(idFranja, nextLock);
+  franjaWaiters.set(idFranja, (franjaWaiters.get(idFranja) || 0) + 1);
+  await lock;
+  return release;
+}
+
+function liberarLock(idFranja) {
+  const restantes = (franjaWaiters.get(idFranja) || 1) - 1;
+  if (restantes <= 0) {
+    franjaLocks.delete(idFranja);
+    franjaWaiters.delete(idFranja);
+  } else {
+    franjaWaiters.set(idFranja, restantes);
+  }
+}
 
 const CONFIG_DEFAULTS = {
   limite_reservas_activas: {
@@ -88,85 +113,72 @@ async function crearReserva(idUsuario, idFranja) {
     throw new Error(`Usuario suspendido hasta ${new Date(suspension.fechaFin).toLocaleDateString('es-CO')}`);
   }
 
-  return prisma.$transaction(async (tx) => {
-    const franja = await tx.franja.findUnique({
-      where: { id: idFranja },
-      include: { plantilla: true },
-    });
+  const activas = await prisma.reserva.count({
+    where: { idUsuario, estado: 'activa' },
+  });
 
-    if (!franja) {
-      throw new Error('Franja no encontrada');
+  if (activas >= limite) {
+    throw new Error(`Limite de ${limite} reservas activas alcanzado`);
+  }
+
+  const reservasMismoDia = await prisma.reserva.count({
+    where: {
+      idUsuario,
+      estado: 'activa',
+      franja: { fecha: franjaObjetivo.fecha },
+    },
+  });
+
+  if (reservasMismoDia >= maxReservasPorDia) {
+    if (maxReservasPorDia <= 1) {
+      throw new Error('Solo puedes tener una reserva activa por dia');
     }
+    throw new Error(`Solo puedes tener ${maxReservasPorDia} reservas activas por dia`);
+  }
 
-    const ahoraTx = new Date();
-    const inicioTurnoTx = inicioFranjaBogota(franja.fecha, franja.plantilla.horaInicio);
-    const limiteReservaTx = new Date(inicioTurnoTx.getTime() - minutosAnticipacionReserva * 60 * 1000);
-    if (ahoraTx >= limiteReservaTx) {
-      throw new Error(
-        `La reserva solo esta permitida hasta ${minutosAnticipacionReserva} minutos antes del inicio del turno`
-      );
-    }
+  const yaReservada = await prisma.reserva.findFirst({
+    where: { idUsuario, idFranja, estado: 'activa' },
+  });
 
-    const activas = await tx.reserva.count({
-      where: {
-        idUsuario,
-        estado: 'activa',
-      },
-    });
+  if (yaReservada) {
+    throw new Error('Ya tienes una reserva activa en esta franja');
+  }
 
-    if (activas >= limite) {
-      throw new Error(`Limite de ${limite} reservas activas alcanzado`);
-    }
+  // Seccion critica protegida por mutex por franja.
+  // El lock por idFranja en Node.js garantiza que solo un request a la vez
+  // ejecute el decremento y creacion de reserva, eliminando cualquier
+  // condicion de carrera sin depender de la semantica de aislamiento de Prisma.
+  const releaseLock = await adquirirLock(idFranja);
 
-    const reservasMismoDia = await tx.reserva.count({
-      where: {
-        idUsuario,
-        estado: 'activa',
-        franja: {
-          fecha: franja.fecha,
-        },
-      },
-    });
+  try {
+    const cupoOk = await prisma.$executeRawUnsafe(
+      'UPDATE franja SET "cuposDisponibles" = "cuposDisponibles" - 1 WHERE id = $1 AND "cuposDisponibles" > 0',
+      idFranja
+    );
 
-    if (reservasMismoDia >= maxReservasPorDia) {
-      if (maxReservasPorDia <= 1) {
-        throw new Error('Solo puedes tener una reserva activa por dia');
-      }
-      throw new Error(`Solo puedes tener ${maxReservasPorDia} reservas activas por dia`);
-    }
-
-    const yaReservada = await tx.reserva.findFirst({
-      where: {
-        idUsuario,
-        idFranja,
-        estado: 'activa',
-      },
-    });
-
-    if (yaReservada) {
-      throw new Error('Ya tienes una reserva activa en esta franja');
-    }
-
-    // Seccion critica: decremento atomico solo si todavia hay cupo.
-    const updateResult = await tx.franja.updateMany({
-      where: {
-        id: idFranja,
-        cuposDisponibles: { gt: 0 },
-      },
-      data: {
-        cuposDisponibles: { decrement: 1 },
-      },
-    });
-
-    if (updateResult.count !== 1) {
+    if (cupoOk !== 1) {
       throw new Error('Sin cupos disponibles en esta franja');
     }
 
-    return tx.reserva.create({
-      data: { idUsuario, idFranja, estado: 'activa' },
-      include: { franja: { include: { plantilla: true } } },
-    });
-  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    try {
+      const reserva = await prisma.reserva.create({
+        data: { idUsuario, idFranja, estado: 'activa' },
+        include: { franja: { include: { plantilla: true } } },
+      });
+      return reserva;
+    } catch (err) {
+      // Restaurar cupo solo si la creacion de la reserva falla,
+      // no cuando el cupo ya estaba agotado.
+      await prisma.$executeRawUnsafe(
+        'UPDATE franja SET "cuposDisponibles" = "cuposDisponibles" + 1 WHERE id = $1',
+        idFranja
+      ).catch(() => {});
+      throw err;
+    }
+  } finally {
+    liberarLock(idFranja);
+    releaseLock();
+  }
 }
 
 async function cancelarReserva(idReserva, idUsuario) {

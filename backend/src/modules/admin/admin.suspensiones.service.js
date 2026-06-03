@@ -9,23 +9,22 @@ async function listarSuspensiones(activas) {
     where.activa = false;
   }
 
-  const suspensiones = await prisma.suspension.findMany({
-    where,
-    include: { usuario: { select: { idInstitucional: true } } },
-    orderBy: { fechaInicio: 'desc' },
-  });
-  });
+   const suspensiones = await prisma.suspension.findMany({
+     where,
+     include: { usuario: { select: { idInstitucional: true } } },
+     orderBy: { fechaInicio: 'desc' },
+   });
 
-  return suspensiones.map((s) => ({
-    id: s.id,
-    idUsuario: s.idUsuario,
-    nombreUsuario: s.usuario?.idInstitucional || s.idUsuario,
-    fechaInicio: s.fechaInicio,
-    fechaFin: s.fechaFin,
-    motivo: s.motivo,
-    activa: s.activa,
-    levantadaPor: s.levantadaPor,
-  }));
+    return suspensiones.map((s) => ({
+      id: s.id,
+      idUsuario: s.idUsuario,
+      nombreUsuario: s.usuario?.idInstitucional || s.idUsuario,
+      fechaInicio: s.fechaInicio,
+      fechaFin: s.fechaFin,
+      motivo: s.motivo,
+      activa: s.activa,
+      levantadaPor: s.levantadaPor,
+    }));
 }
 
 async function crearSuspension({ idUsuario, fechaInicio, fechaFin, motivo }) {
@@ -86,16 +85,16 @@ async function levantarSuspension(id, idAdmin) {
     include: { usuario: { select: { idInstitucional: true } } },
   });
 
-  return {
-    id: actualizada.id,
-    idUsuario: actualizada.idUsuario,
-    nombreUsuario: actualizada.usuario?.idInstitucional || actualizada.idUsuario,
-    fechaInicio: actualizada.fechaInicio,
-    fechaFin: actualizada.fechaFin,
-    motivo: actualizada.motivo,
-    activa: actualizada.activa,
-    levantadaPor: actualizada.levantadaPor,
-  };
-}
-
-module.exports = { listarSuspensiones, crearSuspension, levantarSuspension };
+   return {
+     id: actualizada.id,
+     idUsuario: actualizada.idUsuario,
+     nombreUsuario: actualizada.usuario?.idInstitucional || actualizada.idUsuario,
+     fechaInicio: actualizada.fechaInicio,
+     fechaFin: actualizada.fechaFin,
+     motivo: actualizada.motivo,
+     activa: actualizada.activa,
+     levantadaPor: actualizada.levantadaPor
+   };
+ }
+ 
+ module.exports = { listarSuspensiones, crearSuspension, levantarSuspension };

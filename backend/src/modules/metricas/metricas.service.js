@@ -200,6 +200,7 @@ async function resumen(fecha) {
     30,
     'Minutos minimos de anticipacion para crear reserva'
   );
+  const inicio = parseMonday(fecha);
   const fin = new Date(inicio);
   fin.setDate(inicio.getDate() + 5);
   const inicioAnterior = new Date(inicio);
@@ -218,14 +219,13 @@ async function resumen(fecha) {
     }),
   ]));
 
-  const ahora = new Date();
-  function filtrarVigentes(lista, refAhora = ahora) {
-    return lista.filter(f => {
-      const inicioF = inicioFranjaBogota(f.fecha, f.plantilla.horaInicio);
-      return refAhora < new Date(inicioF.getTime() - minutosAnticipacionReserva * 60000);
-    });
-  }
-  }
+   const ahora = new Date();
+   function filtrarVigentes(lista, refAhora = ahora) {
+     return lista.filter(f => {
+       const inicioF = inicioFranjaBogota(f.fecha, f.plantilla.horaInicio);
+       return refAhora < new Date(inicioF.getTime() - minutosAnticipacionReserva * 60000);
+     });
+   }
 
   function calcularMetricas(listaFranjas) {
     const capacidad = listaFranjas.reduce((acc, f) => acc + f.plantilla.capacidadMaxima, 0);

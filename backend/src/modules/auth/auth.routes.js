@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const controller = require('./auth.controller');
+const { loginLimiter } = require('../../shared/middlewares/rateLimiter.middleware');
 
 /**
  * @openapi
@@ -54,6 +55,6 @@ const controller = require('./auth.controller');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/login', controller.login);
+router.post('/login', loginLimiter, controller.login);
 
 module.exports = router;

@@ -30,6 +30,10 @@ function nivelSaturacion(cuposDisponibles, capacidadMaxima) {
 }
 
 async function obtenerDisponibilidadSemana(fechaInicio) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaInicio)) {
+    throw new Error('Formato de fecha invalido. Use YYYY-MM-DD');
+  }
+
   const anticipacionReservaMin = await leerConfigConDefault(
     'anticipacion_reserva_min',
     30,
@@ -37,6 +41,9 @@ async function obtenerDisponibilidadSemana(fechaInicio) {
   );
 
   const inicio = new Date(fechaInicio);
+  if (isNaN(inicio.getTime())) {
+    throw new Error('Fecha invalida');
+  }
   inicio.setHours(0, 0, 0, 0);
 
   const fechaFin = new Date(inicio);

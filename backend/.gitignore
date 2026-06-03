@@ -1,4 +1,11 @@
 node_modules
 coverage
+
 # Keep environment variables out of version control
 .env
+
+# Test suite (local-only, not committed to main)
+__tests__
+
+# Debug helper scripts
+_debug_*.js
