@@ -45,11 +45,12 @@ async function cancelarReservasActivasDeUsuario(tx, idUsuario) {
 }
 
 async function aplicarSuspension(tx, idUsuario, motivo) {
-  const dias = await leerConfig('dias_suspension_por_noshow', 7);
+  const fila = await tx.configuracion.findUnique({ where: { clave: 'dias_suspension_por_noshow' } });
+  const parsed = fila ? parseInt(fila.valor, 10) : NaN;
+  const dias = Number.isFinite(parsed) ? parsed : 7;
   const fechaInicio = new Date();
   const fechaFin = new Date(fechaInicio);
   fechaFin.setDate(fechaFin.getDate() + dias);
-
   const suspension = await tx.suspension.create({
     data: {
       idUsuario,
