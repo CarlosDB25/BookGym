@@ -88,6 +88,7 @@ export function ScannerHub({ onNotice }) {
   }, [])
 
   useEffect(() => {
+    let mounted = true
     let instance
     async function startScanner() {
       try {
@@ -103,14 +104,20 @@ export function ScannerHub({ onNotice }) {
           },
           () => {}
         )
+        if (!mounted) {
+          instance.stop().catch(() => {})
+          return
+        }
+        scannerRef.current = instance
         setScanner(instance)
         setScanning(true)
       } catch {
-        setScanning(false)
+        if (mounted) setScanning(false)
       }
     }
     startScanner()
     return () => {
+      mounted = false
       if (instance) instance.stop().catch(() => {})
     }
   }, [])

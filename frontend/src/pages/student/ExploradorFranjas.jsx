@@ -123,7 +123,7 @@ export function ExploradorFranjas({ onNotice }) {
             >
               <span className="text-xs">{formatDayHeader(day).split(' ')[0]}</span>
               <span className="text-base font-bold">
-                {formatDayHeader(day).split(' ')[1]?.replace('/', '')}
+                {formatDayHeader(day).split(' ')[1]?.split('/')[0]}
               </span>
               {isToday && (
                 <span className={`text-[10px] ${isSelected ? 'text-white/80' : 'text-primary'}`}>

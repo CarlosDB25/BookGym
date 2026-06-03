@@ -245,21 +245,24 @@ export function AdminUsuarios({ onNotice }) {
 
       <AnimatePresence>
         {drawerOpen && selectedUser && (
-          <>
-            <motion.div
-              className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setDrawerOpen(false)}
-            />
-            <motion.aside
-              className="fixed right-0 top-0 z-50 h-full w-[450px] overflow-y-auto border-l border-slate-200 bg-white shadow-elevated"
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            >
+          <motion.div
+            key="drawer-backdrop"
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setDrawerOpen(false)}
+          />
+        )}
+        {drawerOpen && selectedUser && (
+          <motion.aside
+            key="drawer-panel"
+            className="fixed right-0 top-0 z-50 h-full w-[450px] overflow-y-auto border-l border-slate-200 bg-white shadow-elevated"
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+          >
               <div className="flex items-center justify-between border-b border-slate-100 p-5">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-primary-50 p-3">
@@ -316,7 +319,6 @@ export function AdminUsuarios({ onNotice }) {
                 )}
               </div>
             </motion.aside>
-          </>
         )}
       </AnimatePresence>
     </div>

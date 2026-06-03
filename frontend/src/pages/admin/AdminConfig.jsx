@@ -43,9 +43,16 @@ export function AdminConfig({ onNotice }) {
     setHasChanges(true)
   }
 
+  function toSnakeCase(str) {
+    return str.replace(/([A-Z])/g, '_$1').toLowerCase()
+  }
+
   async function handleSave() {
     try {
-      await actualizar.mutateAsync(formValues)
+      const snakePayload = Object.fromEntries(
+        Object.entries(formValues).map(([k, v]) => [toSnakeCase(k), v])
+      )
+      await actualizar.mutateAsync(snakePayload)
       onNotice?.('success', 'Reglas publicadas exitosamente')
       setHasChanges(false)
     } catch (err) {
