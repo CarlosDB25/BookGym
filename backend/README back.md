@@ -187,4 +187,4 @@ Configuración de pool en DATABASE_URL:
 - Crea `Suspension` con `dias_suspension_por_noshow` desde `configuracion` cuando se acumula `umbral_noshow`.
 - Cancela en cascada las reservas activas del usuario suspendido (transaccional, libera cupos).
 - Logs en consola con prefijo `[NoShow]` (cambios de estado) y `[AUDIT][NoShow]` (suspensiones aplicadas).
-- Pruebas: `npm run test:noshow` (6 tests: cambio de estado, idempotencia, franjas no vencidas, cascada de suspensi�n, no duplicar suspensi�n, etc).
+- Pruebas: `npm run test:noshow` (6 tests: cambio de estado, idempotencia, franjas no vencidas, cascada de suspensión, no duplicar suspensión, etc).
