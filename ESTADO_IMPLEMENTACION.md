@@ -19,9 +19,11 @@ Este documento resume lo que ya esta cubierto por la implementacion actual y lo 
 - RF16 suspensiones temporales como regla operativa persistida en base de datos
 - RF17 registro persistente de suspensiones como entidad de negocio
 - RF18 almacenamiento solo de datos operativos necesarios
-- RF14 promedio historico por dia y franja para estimar saturacion, implementado via GET /api/metricas/recomendaciones
-- RF15 sugerencia de franjas alternativas ordenadas por menor saturacion, implementado via GET /api/metricas/recomendaciones
-- HU5 recomendaciones de menor saturacion con clasificacion pico/valle implementada en backend
+- RF14 promedio historico por dia y franja para estimar saturacion, implementado via GET /api/metricas/recomendaciones con personalizacion por usuario
+- RF15 sugerencia de franjas alternativas ordenadas por menor saturacion con afinidad personalizada (alta/media/neutra)
+- HU5 recomendaciones de menor saturacion con clasificacion pico/valle implementada en backend y analisis admin (GET /api/metricas/analisis)
+- Analisis granular por dia/semana/mes con desglose, comparacion inter-periodo y deteccion de horas pico/valle
+- Metricas de resumen enriquecidas con comparacion semana-anterior, tasa no-show y tendencia de ocupacion
 - HU1, HU2, HU4, HU7, HU9 en la parte que corresponde a reservas, metricas y suspensiones persistidas
 
 ### Parcial
@@ -90,11 +92,33 @@ Este documento resume lo que ya esta cubierto por la implementacion actual y lo 
 
 - endpoint GET /api/metricas/recomendaciones para estudiantes
 - calculo de ocupacion historica agrupado por dia y hora
+- tendencia calculada (subiendo/estable/bajando) comparando periodos reciente vs antiguo
 - clasificacion pico (>80%) / valle (<=80%)
 - ordenamiento ascendente por saturacion
-- exclusion de reservas canceladas
+- personalizacion por usuario: perfil (diasFrecuentes, horaHabitual) y afinidad (alta/media/neutra)
+- cupos disponibles esta semana cruzados con disponibilidad actual
 - analisis sobre ultimos 90 dias
 - documentado con Swagger
+
+### Analisis de Metricas (admin)
+
+- endpoint GET /api/metricas/analisis para administradores
+- tres modos de agregacion: dia, semana, mes
+- desglose por periodo (horario, dia de semana, diario segun tipo)
+- comparacion con periodo anterior (cambio porcentual)
+- deteccion de horas pico (>=75%) y valle (<25%)
+- calculo de tasa no-show
+- timeout de consulta con respuesta 504 para rangos grandes
+
+### Resumen de Metricas (admin)
+
+- endpoint GET /api/metricas/resumen enriquecido
+- ocupacion promedio, capacidad y reservadas de la semana
+- comparacion semana-anterior con cambio porcentual
+- tendencia de ocupacion (subiendo/estable/bajando)
+- distribucion de saturacion (alta/media/baja)
+- tasa de no-show semanal
+- horas pico y valle con slots especificos
 
 ### Documentacion
 

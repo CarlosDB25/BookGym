@@ -17,7 +17,7 @@ async function login(idInstitucional, password) {
   const token = jwt.sign(
     { id: usuario.idInstitucional, rol: usuario.rol },
     process.env.JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: '8h', algorithm: 'HS256' }
   );
 
   return { token, rol: usuario.rol, id: usuario.idInstitucional };

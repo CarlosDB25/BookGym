@@ -99,18 +99,106 @@ const options = {
             mensaje: { type: 'string', example: 'Reserva cancelada exitosamente' },
           },
         },
+        SlotSaturacion: {
+          type: 'object',
+          properties: {
+            dia: { type: 'string', example: 'lunes' },
+            horaInicio: { type: 'string', example: '07:00' },
+            saturacion: { type: 'integer', example: 85 },
+          },
+        },
         MetricasResumen: {
           type: 'object',
           properties: {
-            semana: { type: 'string', example: '2026-03-23' },
+            semana: { type: 'string', example: '2026-06-01' },
             totalCapacidad: { type: 'integer', example: 1500 },
             totalDisponibles: { type: 'integer', example: 1320 },
             totalReservadas: { type: 'integer', example: 180 },
             ocupacionPromedio: { type: 'integer', example: 12 },
+            tendenciaOcupacion: { type: 'string', enum: ['subiendo', 'estable', 'bajando'], example: 'subiendo' },
+            cambioVsSemanaAnterior: { type: 'string', example: '+3%' },
             saturacionAlta: { type: 'integer', example: 3 },
             saturacionMedia: { type: 'integer', example: 11 },
             saturacionBaja: { type: 'integer', example: 61 },
             totalFranjas: { type: 'integer', example: 75 },
+            tasaNoShow: { type: 'integer', example: 8 },
+            horasPico: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/SlotSaturacion' },
+            },
+            horasValle: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/SlotSaturacion' },
+            },
+          },
+        },
+        RecomendacionSlot: {
+          type: 'object',
+          properties: {
+            dia: { type: 'string', example: 'martes' },
+            horaInicio: { type: 'string', example: '14:00' },
+            saturacionHistorica: { type: 'integer', example: 12 },
+            tendencia: { type: 'string', enum: ['subiendo', 'estable', 'bajando'], example: 'estable' },
+            cuposRestantes: { type: 'integer', example: 18 },
+            fechaProxima: { type: 'string', format: 'date', example: '2026-06-02' },
+            afinidad: { type: 'string', enum: ['alta', 'media', 'neutra'], example: 'alta' },
+            razon: { type: 'string', example: 'Coincide con tus horarios habituales y tiene baja saturación histórica' },
+          },
+        },
+        RecomendacionResponse: {
+          type: 'object',
+          properties: {
+            semanaAnalizada: { type: 'string', example: '2026-06-01' },
+            periodoHistorial: { type: 'string', example: '90 dias' },
+            totalSlotsAnalizados: { type: 'integer', example: 75 },
+            perfilUsuario: {
+              type: 'object',
+              properties: {
+                diasFrecuentes: { type: 'array', items: { type: 'string' }, example: ['lunes', 'miercoles'] },
+                horaHabitual: { type: 'string', example: '14:00' },
+              },
+            },
+            mejoresMomentos: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/RecomendacionSlot' },
+            },
+            evitando: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  dia: { type: 'string' },
+                  horaInicio: { type: 'string' },
+                  saturacionHistorica: { type: 'integer' },
+                  tendencia: { type: 'string' },
+                  razon: { type: 'string' },
+                },
+              },
+            },
+            conTendenciaAlza: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  dia: { type: 'string' },
+                  horaInicio: { type: 'string' },
+                  saturacionHistorica: { type: 'integer' },
+                  sugerencia: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        AnalisisDesglose: {
+          type: 'object',
+          properties: {
+            periodo: { type: 'string', example: '2026-06-01' },
+            capacidad: { type: 'integer', example: 300 },
+            reservadas: { type: 'integer', example: 45 },
+            ocupacion: { type: 'integer', example: 15 },
+            noShows: { type: 'integer', example: 3 },
+            tasaNoShow: { type: 'integer', example: 6 },
+            franjas: { type: 'integer', example: 15 },
           },
         },
         Asistencia: {
