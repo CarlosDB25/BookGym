@@ -22,7 +22,7 @@ async function resumen(req, res) {
 
 async function recomendaciones(req, res) {
   try {
-    const limite = Math.min(parseInt(req.query.limite, 10) || 5, 20);
+    const limite = Math.max(1, Math.min(parseInt(req.query.limite, 10) || 5, 20));
     const usuarioId = req.usuario?.id || null;
     const data = await service.recomendaciones(limite, usuarioId);
     return res.json(data);
