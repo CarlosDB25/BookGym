@@ -73,7 +73,7 @@ export function DashboardAnalitico({ onNotice }) {
     <div className="grid grid-cols-12 gap-6 p-6">
       <div className="col-span-3">
         <KpiCard
-          icon={Activity}
+          icon={IconActivity}
           label="Ocupación"
           value={`${ocupacion}%`}
           trend={tendencia}
@@ -90,14 +90,14 @@ export function DashboardAnalitico({ onNotice }) {
       </div>
       <div className="col-span-3">
         <KpiCard
-          icon={Users}
+          icon={IconUsers}
           label="Suspendidos"
           value={resumen?.suspendidos || 0}
         />
       </div>
       <div className="col-span-3">
         <KpiCard
-          icon={TrendingUp}
+          icon={IconTrendingUp}
           label="Capacidad Total"
           value={resumen?.totalCapacidad || 0}
         />
