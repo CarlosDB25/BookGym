@@ -156,3 +156,13 @@ Configuración de pool en DATABASE_URL:
 
 - `GET /health`: validación de disponibilidad del servicio
 - `GET /api/configuracion/reglas-reserva`: diagnóstico rápido de reglas activas
+
+## 11) Motor de No-Show
+
+- Entry point: `src/scheduler/noshow.scheduler.js` registra el cron */15 * * * *.
+- Procesador: `src/scheduler/noshow.processor.js` contiene `procesarNoShows()` (idempotente, exportable para tests).
+- Cambia estado de `Reserva` de `activa` a `no_show` (nuevo valor en enum `EstadoReserva`).
+- Crea `Suspension` con `dias_suspension_por_noshow` desde `configuracion` cuando se acumula `umbral_noshow`.
+- Cancela en cascada las reservas activas del usuario suspendido (transaccional, libera cupos).
+- Logs en consola con prefijo `[NoShow]` (cambios de estado) y `[AUDIT][NoShow]` (suspensiones aplicadas).
+- Pruebas: `npm run test:noshow` (6 tests: cambio de estado, idempotencia, franjas no vencidas, cascada de suspensi�n, no duplicar suspensi�n, etc).

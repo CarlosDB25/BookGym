@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const prisma = require('../shared/prisma/client');
+const { procesarNoShows } = require('./noshow.processor');
 
 function getWeekRange() {
   const now = new Date();
@@ -61,7 +62,6 @@ async function sincronizarFranjasSemanaActual() {
     await prisma.franja.createMany({ data: crear });
   }
 
-  // Depura franjas fuera de la semana actual solo cuando no tienen reservas asociadas.
   await prisma.franja.deleteMany({
     where: {
       AND: [
@@ -72,12 +72,35 @@ async function sincronizarFranjasSemanaActual() {
   });
 }
 
-function iniciarNoShowScheduler() {
-  sincronizarFranjasSemanaActual().catch((error) => console.error('Error sincronizando franjas iniciales:', error));
-
-  cron.schedule('5 0 * * *', () => {
-    sincronizarFranjasSemanaActual().catch((error) => console.error('Error en sincronizacion diaria de franjas:', error));
-  });
+async function ejecutarNoShow() {
+  try {
+    const resultado = await procesarNoShows();
+    console.log(
+      `[NoShow scheduler] procesadas=${resultado.procesadas} suspendidos=${resultado.suspendidos.length}`
+    );
+  } catch (error) {
+    console.error('[NoShow scheduler] error:', error.message);
+  }
 }
 
-module.exports = { iniciarNoShowScheduler, sincronizarFranjasSemanaActual };
+function iniciarNoShowScheduler() {
+  sincronizarFranjasSemanaActual().catch((error) =>
+    console.error('Error sincronizando franjas iniciales:', error)
+  );
+
+  cron.schedule('5 0 * * *', () => {
+    sincronizarFranjasSemanaActual().catch((error) =>
+      console.error('Error en sincronizacion diaria de franjas:', error)
+    );
+  });
+
+  cron.schedule('*/15 * * * *', () => {
+    ejecutarNoShow().catch((error) =>
+      console.error('[NoShow scheduler] error en ejecucion:', error.message)
+    );
+  });
+
+  console.log('[NoShow scheduler] iniciado: cron "*/15 * * * *" (cada 15 minutos)');
+}
+
+module.exports = { iniciarNoShowScheduler, sincronizarFranjasSemanaActual, procesarNoShows };
