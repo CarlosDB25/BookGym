@@ -219,11 +219,12 @@ async function resumen(fecha) {
   ]));
 
   const ahora = new Date();
-  function filtrarVigentes(lista) {
+  function filtrarVigentes(lista, refAhora = ahora) {
     return lista.filter(f => {
       const inicioF = inicioFranjaBogota(f.fecha, f.plantilla.horaInicio);
-      return ahora < new Date(inicioF.getTime() - minutosAnticipacionReserva * 60000);
+      return refAhora < new Date(inicioF.getTime() - minutosAnticipacionReserva * 60000);
     });
+  }
   }
 
   function calcularMetricas(listaFranjas) {
