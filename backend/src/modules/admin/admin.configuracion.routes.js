@@ -81,6 +81,15 @@ router.use(verificarToken, soloAdmin);
  *                 anticipacionCancelacionMin:
  *                   type: integer
  *                   example: 20
+ *                 umbralNoshow:
+ *                   type: integer
+ *                   example: 5
+ *                 ventanaCheckinMin:
+ *                   type: integer
+ *                   example: 20
+ *                 diasSuspensionPorNoshow:
+ *                   type: integer
+ *                   example: 10
  *       400:
  *         description: Campos vacios, claves no validas o valores no enteros positivos
  *         content:
