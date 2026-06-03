@@ -38,7 +38,34 @@ async function actualizarReglas(datos) {
     });
   }
 
-  return configuracionService.obtenerReglasReserva();
+  await Promise.all(
+    Object.entries(DEFAULT_REGLAS).map(([clave, def]) =>
+      prisma.configuracion.upsert({
+        where: { clave },
+        update: {},
+        create: { clave, valor: String(def.valor), descripcion: def.descripcion },
+      })
+    )
+  );
+
+  const filas = await prisma.configuracion.findMany({
+    where: { clave: { in: Object.keys(DEFAULT_REGLAS) } },
+    select: { clave: true, valor: true },
+  });
+
+  const valores = Object.fromEntries(
+    filas.map((f) => [f.clave, parseInt(f.valor, 10)])
+  );
+
+  return {
+    limiteReservasActivas: valores.limite_reservas_activas,
+    maxReservasPorDia: valores.max_reservas_por_dia,
+    anticipacionReservaMin: valores.anticipacion_reserva_min,
+    anticipacionCancelacionMin: valores.anticipacion_cancelacion_min,
+    umbralNoshow: valores.umbral_noshow,
+    ventanaCheckinMin: valores.ventana_checkin_min,
+    diasSuspensionPorNoshow: valores.dias_suspension_por_noshow,
+  };
 }
 
 const DEFAULT_REGLAS = {
