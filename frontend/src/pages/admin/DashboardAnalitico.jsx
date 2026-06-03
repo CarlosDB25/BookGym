@@ -109,16 +109,16 @@ export function DashboardAnalitico({ onNotice }) {
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={analisisData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="dia" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+              <XAxis dataKey="periodo" tick={{ fontSize: 12 }} stroke="#94a3b8" />
               <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }}
               />
-              <Bar dataKey="porcentajeOcupacion" name="Ocupación %" radius={[8, 8, 0, 0]}>
+              <Bar dataKey="ocupacion" name="Ocupación %" radius={[8, 8, 0, 0]}>
                 {analisisData.map((entry, idx) => (
                   <Cell
                     key={idx}
-                    fill={HEAT_COLORS[Math.min(Math.floor((entry.porcentajeOcupacion || 0) / 12.5), 7)]}
+                    fill={HEAT_COLORS[Math.min(Math.floor((entry.ocupacion || 0) / 12.5), 7)]}
                   />
                 ))}
               </Bar>
@@ -180,14 +180,14 @@ export function DashboardAnalitico({ onNotice }) {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="dia" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+              <XAxis dataKey="periodo" tick={{ fontSize: 12 }} stroke="#94a3b8" />
               <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }}
               />
               <Area
                 type="monotone"
-                dataKey="porcentajeOcupacion"
+                dataKey="ocupacion"
                 stroke="#4f46e5"
                 strokeWidth={2}
                 fill="url(#fillOcupacion)"
