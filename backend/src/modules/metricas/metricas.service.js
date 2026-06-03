@@ -293,8 +293,8 @@ async function analisis(tipo, fecha) {
   }
 
   const inicioAnterior = new Date(finAnterior);
-  const finAnteriorCalc = new Date(inicio);
-
+  const finAnteriorCalc = new Date(tipo === 'semana' ? inicioAnterior : inicio);
+  if (tipo === 'semana') finAnteriorCalc.setDate(finAnteriorCalc.getDate() + 5);
   const [franjas, franjasAnteriores] = await withTimeout(Promise.all([
     prisma.franja.findMany({
       where: { fecha: { gte: inicio, lt: fin } },
