@@ -195,8 +195,11 @@ async function recomendaciones(limite = 5, usuarioId = null) {
 }
 
 async function resumen(fecha) {
-  const minutosAnticipacionReserva = await leerConfigConDefault('anticipacion_reserva_min', 30, '');
-  const inicio = parseMonday(fecha);
+  const minutosAnticipacionReserva = await leerConfigConDefault(
+    'anticipacion_reserva_min',
+    30,
+    'Minutos minimos de anticipacion para crear reserva'
+  );
   const fin = new Date(inicio);
   fin.setDate(inicio.getDate() + 5);
   const inicioAnterior = new Date(inicio);
