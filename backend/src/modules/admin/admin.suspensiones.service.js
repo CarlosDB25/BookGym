@@ -54,7 +54,7 @@ async function crearSuspension({ idUsuario, fechaInicio, fechaFin, motivo }) {
       motivo,
       activa: true,
     },
-    include: { usuario: true },
+    include: { usuario: { select: { idInstitucional: true } } },
   });
 
   return {
