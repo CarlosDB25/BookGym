@@ -37,7 +37,7 @@ async function crearSuspension({ idUsuario, fechaInicio, fechaFin, motivo }) {
   }
 
   const suspensionActiva = await prisma.suspension.findFirst({
-    where: { idUsuario, activa: true },
+    where: { idUsuario, activa: true, fechaFin: { gte: new Date() } },
   });
   if (suspensionActiva) {
     throw Object.assign(
