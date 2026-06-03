@@ -25,7 +25,7 @@ export function ScannerHub({ onNotice }) {
   const [modalOpen, setModalOpen] = useState(false)
   const [flashGreen, setFlashGreen] = useState(false)
 
-  const studentName = studentData?.nombre || studentData?.id || cedula
+  const studentName = studentData?.usuario?.id || cedula
 
   async function buscarEstudiante(documento) {
     if (!documento || documento.length < 3) return

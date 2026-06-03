@@ -62,6 +62,7 @@ async function verificarEstudiante(cedula) {
   if (suspension) {
     return {
       estado: 'SUSPENDIDO',
+      id: usuario.idInstitucional,
       usuario: { id: usuario.idInstitucional, rol: usuario.rol, estado: usuario.estado },
       suspension: {
         id: suspension.id,
@@ -96,6 +97,7 @@ async function verificarEstudiante(cedula) {
     if (ahora >= aperturaVentana && ahora <= cierreVentana) {
       return {
         estado: 'RESERVA_ENCONTRADA',
+        id: usuario.idInstitucional,
         usuario: { id: usuario.idInstitucional, rol: usuario.rol, estado: usuario.estado },
         reserva: {
           id: reserva.id,
@@ -113,6 +115,7 @@ async function verificarEstudiante(cedula) {
 
   return {
     estado: 'SIN_RESERVA',
+    id: usuario.idInstitucional,
     usuario: { id: usuario.idInstitucional, rol: usuario.rol, estado: usuario.estado },
     mensaje: 'El estudiante no tiene reserva para la franja actual. Requiere ingreso manual/sobrecupo.',
   };
