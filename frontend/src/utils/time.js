@@ -23,9 +23,14 @@ export function nowMillis() {
 }
 
 export function parseSlotMillis(dateISO, hour) {
-  if (!dateISO) return NaN
+  if (!dateISO || !hour) return NaN
   const ymd = dateISO.split('T')[0]
-  return dayjs.tz(`${ymd} ${hour}`, 'YYYY-MM-DD HH:mm', TZ).valueOf()
+  try {
+    const ms = dayjs.tz(`${ymd} ${hour}`, 'YYYY-MM-DD HH:mm', TZ).valueOf()
+    return Number.isNaN(ms) ? NaN : ms
+  } catch {
+    return NaN
+  }
 }
 
 export function mondayFromYMD(ymd) {
@@ -39,7 +44,11 @@ export function mondayFromYMD(ymd) {
 export function formatDate(iso) {
   if (!iso) return ''
   const ymd = iso.split('T')[0]
-  return dayjs.tz(ymd, 'YYYY-MM-DD', TZ).format('dddd D MMM')
+  try {
+    return dayjs.tz(ymd, 'YYYY-MM-DD', TZ).format('dddd D MMM')
+  } catch {
+    return ''
+  }
 }
 
 export function formatDayHeader(iso) {

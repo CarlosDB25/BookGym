@@ -15,6 +15,7 @@ const SCENARIO = {
 
 export function ScannerHub({ onNotice }) {
   const scannerRef = useRef(null)
+  const scannerContainerRef = useRef(null)
   const inputRef = useRef(null)
   const [scanner, setScanner] = useState(null)
   const [scanning, setScanning] = useState(false)
@@ -88,6 +89,7 @@ export function ScannerHub({ onNotice }) {
   }, [])
 
   useEffect(() => {
+    const containerEl = scannerContainerRef.current
     let mounted = true
     let instance
     async function startScanner() {
@@ -118,7 +120,12 @@ export function ScannerHub({ onNotice }) {
     startScanner()
     return () => {
       mounted = false
-      if (instance) instance.stop().catch(() => {})
+      const curr = instance || scannerRef.current
+      scannerRef.current = null
+      if (containerEl) {
+        try { containerEl.innerHTML = '' } catch { /* ignore */ }
+      }
+      if (curr) curr.stop().catch(() => {})
     }
   }, [])
 
@@ -126,6 +133,7 @@ export function ScannerHub({ onNotice }) {
     <div className="grid h-[calc(100vh-70px)] grid-cols-12 gap-6 overflow-hidden p-6">
       <div className="col-span-5 flex flex-col gap-4">
         <div
+          ref={scannerContainerRef}
           id="scanner-view"
           className={`relative aspect-video overflow-hidden rounded-2xl bg-slate-900 ${
             flashGreen ? 'ring-4 ring-success-400' : ''

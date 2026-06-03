@@ -31,9 +31,10 @@ export function MisCupos({ onNotice }) {
 
   const activasConEstado = useMemo(() => {
     return reservas.map((r) => {
-      const franja = r.franja
-      const inicio = parseSlotMillis(franja.fecha, franja.horaInicio)
-      const fin = parseSlotMillis(franja.fecha, franja.horaFin)
+      const franja = r.franja || {}
+      const plantilla = franja.plantilla || {}
+      const inicio = parseSlotMillis(franja.fecha, plantilla.horaInicio)
+      const fin = parseSlotMillis(franja.fecha, plantilla.horaFin)
       const puedeCancelar = isWithinWindow(inicio, reglas?.anticipacionCancelacionMin || 30)
       const enVentanaCheckin =
         now >= inicio - windowCheckin * 60 * 1000 && now <= fin
@@ -48,7 +49,7 @@ export function MisCupos({ onNotice }) {
       type: 'info',
       title: 'Cancelar reserva',
       lines: [
-        `${reserva.franja.diaSemana} · ${reserva.franja.horaInicio} - ${reserva.franja.horaFin}`,
+        `${reserva.franja?.plantilla?.diaSemana || reserva.franja?.diaSemana || ''} · ${reserva.franja?.plantilla?.horaInicio || reserva.franja?.horaInicio || ''} - ${reserva.franja?.plantilla?.horaFin || reserva.franja?.horaFin || ''}`,
         `¿Estás seguro? Esta acción no se puede deshacer.`,
       ],
       confirm: true,
@@ -163,13 +164,13 @@ export function MisCupos({ onNotice }) {
                       nivel={reserva.enVentanaCheckin ? 'baja' : 'media'}
                     />
                     <span className="text-xs font-medium text-slate-400">
-                      {formatDate(reserva.franja.fecha)}
+                      {formatDate(reserva.franja?.fecha)}
                     </span>
                   </div>
                   <p className="mt-2 text-lg font-bold text-slate-800">
-                    {reserva.franja.horaInicio} - {reserva.franja.horaFin}
+                    {reserva.franja?.plantilla?.horaInicio || reserva.franja?.horaInicio || ''} - {reserva.franja?.plantilla?.horaFin || reserva.franja?.horaFin || ''}
                   </p>
-                  <p className="text-sm text-slate-500">{reserva.franja.diaSemana}</p>
+                  <p className="text-sm text-slate-500">{reserva.franja?.plantilla?.diaSemana || reserva.franja?.diaSemana || ''}</p>
 
                   <div className="mt-3 flex flex-wrap gap-2">
                     {reserva.enVentanaCheckin && (
@@ -238,10 +239,10 @@ export function MisCupos({ onNotice }) {
                   >
                     <div>
                       <p className="text-sm font-medium text-slate-800">
-                        {reserva.franja?.horaInicio} - {reserva.franja?.horaFin}
+                        {reserva.franja?.plantilla?.horaInicio || reserva.franja?.horaInicio || ''} - {reserva.franja?.plantilla?.horaFin || reserva.franja?.horaFin || ''}
                       </p>
                       <p className="text-xs text-slate-500">
-                        {reserva.franja?.diaSemana} · {formatDate(reserva.franja?.fecha)}
+                        {reserva.franja?.plantilla?.diaSemana || reserva.franja?.diaSemana || ''} · {formatDate(reserva.franja?.fecha)}
                       </p>
                     </div>
                     <span className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${color}`}>
