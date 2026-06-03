@@ -1,6 +1,6 @@
 # Backend BookGym
 
-API REST del prototipo de reservas de gimnasio universitario.
+API REST sistema de reservas de gimnasio universitario.
 
 ## 1) Stack técnico
 
@@ -70,7 +70,9 @@ Comportamientos:
 - `POST /api/reservas`
 - `DELETE /api/reservas/:id`
 - `POST /api/reservas/:id/check-in`
+- `GET /api/metricas/recomendaciones?limite=N`
 - `GET /api/metricas/resumen?fecha=YYYY-MM-DD`
+- `GET /api/metricas/analisis?tipo=semana|dia|mes&fecha=YYYY-MM-DD`
 - `GET /api/configuracion/reglas-reserva`
 
 ## 8) Flujo end-to-end backend
@@ -98,12 +100,28 @@ Comportamientos:
 3. Transacción: estado cancelada + incremento de cupo.
 4. Reserva se mueve a historial en lecturas posteriores.
 
+### Flujo de recomendaciones
+
+1. Estudiante autenticado solicita recomendaciones.
+2. Backend consulta franjas pasadas (últimos 90 días) con reservas no canceladas.
+3. Agrupa por día de semana y hora de inicio.
+4. Divide en periodo reciente y antiguo para calcular tendencia (subiendo/estable/bajando).
+5. Cruza con disponibilidad de la semana actual (cupos restantes).
+6. Si el estudiante tiene historial, personaliza afinidad (alta/media/neutra) según sus horarios frecuentes.
+7. Clasifica como `pico` (>80%) o `valle` (≤80%).
+8. Retorna: mejoresMomentos (ordenados por saturación), evitando (alta saturación), conTendenciaAlza.
+9. Timeout de 25s por consulta; si se excede, retorna error 500.
+
 ### Flujo de métricas admin
 
-1. Admin solicita resumen semanal.
+1. Admin solicita resumen o análisis.
 2. Backend toma franjas reservables vigentes (descarta pasadas/no reservables).
-3. Calcula capacidad/disponibilidad/ocupación/saturación.
-4. Excluye canceladas por definición de conteo activo.
+3. Calcula capacidad/disponibilidad/ocupación/saturación + tasa no-show.
+4. Compara contra semana anterior (cambio porcentual y tendencia).
+5. Detecta horas pico (≥75%) y valle (<25%).
+6. Para análisis, agrupa por día/semana/mes con desglose detallado.
+7. Excluye canceladas por definición de conteo activo.
+8. Timeout de 25s; análisis retorna 504 si excede (para rangos grandes).
 
 ## 9) Swagger
 
@@ -120,7 +138,21 @@ URLs:
 - UI Railway: `https://bookgym-production.up.railway.app/api/docs`
 - JSON Railway: `https://bookgym-production.up.railway.app/api/docs.json`
 
-## 10) Salud y operación
+## 10) Timeouts y Railway
+
+Las consultas a métricas (recomendaciones, resumen, analisis) operan sobre grandes volúmenes de datos históricos (hasta 90 días). El backend usa `withTimeout()` con límite de 25s por consulta.
+
+Comportamiento en timeout:
+- `/api/metricas/recomendaciones` y `/api/metricas/resumen`: retornan 500
+- `/api/metricas/analisis`: retorna 504 (Gateway Timeout) para que el frontend lo maneje sin confundirlo con error interno
+
+Los logs `SSL error: unexpected eof while reading` en Railway son normales. Railway usa un proxy entre la app y PostgreSQL que ocasionalmente cierra conexiones inactivas. No afectan la funcionalidad. Para deploy en Railway, usar connection string interna para evitar el proxy.
+
+Configuración de pool en DATABASE_URL:
+- `connection_limit=5`: máximo de conexiones concurrentes
+- `pool_timeout=15`: tiempo de espera por conexión del pool
+
+## 11) Salud y operación
 
 - `GET /health`: validación de disponibilidad del servicio
 - `GET /api/configuracion/reglas-reserva`: diagnóstico rápido de reglas activas

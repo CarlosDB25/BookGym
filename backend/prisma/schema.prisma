@@ -112,6 +112,8 @@ enum DiaSemana {
 enum EstadoReserva {
   activa
   cancelada
+  completada
+  no_show
 }
 
 enum Resultado {

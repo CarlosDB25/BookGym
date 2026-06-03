@@ -11,7 +11,12 @@ async function login(req, res) {
     const data = await authService.login(idInstitucional, password);
     return res.json(data);
   } catch (error) {
-    return res.status(400).json({ error: error.message });
+    const msg = error?.message || '';
+    if (msg === 'Credenciales invalidas') {
+      return res.status(401).json({ error: msg });
+    }
+    console.error('Error en login:', msg);
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
 }
 
