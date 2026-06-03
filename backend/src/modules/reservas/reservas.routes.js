@@ -199,4 +199,34 @@ router.post('/', controller.crear);
  */
 router.delete('/:id', controller.cancelar);
 
+/**
+ * @openapi
+ * /api/reservas/{id}/check-in:
+ *   post:
+ *     tags:
+ *       - Reservas
+ *     summary: Registrar check-in propio
+ *     description: Marca asistencia del estudiante autenticado sobre su reserva activa.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Check-in registrado exitosamente
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: No autorizado para esta reserva
+ *       404:
+ *         description: Reserva no encontrada
+ *       409:
+ *         description: Check-in ya registrado
+ */
+router.post('/:id/check-in', controller.checkin);
+
 module.exports = router;

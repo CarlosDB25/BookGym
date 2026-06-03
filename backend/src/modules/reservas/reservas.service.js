@@ -236,6 +236,39 @@ async function obtenerReservasActivas(idUsuario) {
   return activas.filter((r) => esFranjaVigente(r.franja));
 }
 
+async function registrarCheckin(idReserva, idUsuario) {
+  const reserva = await prisma.reserva.findUnique({
+    where: { id: idReserva },
+    include: { asistencia: { select: { id: true } } },
+  });
+
+  if (!reserva) {
+    throw new Error('Reserva no encontrada');
+  }
+
+  if (reserva.idUsuario !== idUsuario) {
+    throw new Error('No autorizado');
+  }
+
+  if (reserva.estado !== 'activa') {
+    throw new Error('La reserva no esta activa');
+  }
+
+  if (reserva.asistencia) {
+    throw new Error('El check-in ya fue registrado para esta reserva');
+  }
+
+  await prisma.asistencia.create({
+    data: {
+      idReserva: reserva.id,
+      registradoPor: idUsuario,
+      resultado: 'presente',
+    },
+  });
+
+  return { mensaje: 'Check-in registrado exitosamente' };
+}
+
 async function obtenerHistorialReservas(idUsuario) {
   const reservas = await prisma.reserva.findMany({
     where: { idUsuario },
@@ -251,4 +284,5 @@ module.exports = {
   cancelarReserva,
   obtenerReservasActivas,
   obtenerHistorialReservas,
+  registrarCheckin,
 };

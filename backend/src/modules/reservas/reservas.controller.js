@@ -42,4 +42,17 @@ async function historial(req, res) {
   }
 }
 
-module.exports = { crear, cancelar, misReservas, historial };
+async function checkin(req, res) {
+  try {
+    const resultado = await service.registrarCheckin(req.params.id, req.usuario.id);
+    return res.json(resultado);
+  } catch (error) {
+    const status = error.message.includes('No autorizado') ? 403
+      : error.message.includes('no encontrada') ? 404
+      : error.message.includes('ya fue') ? 409
+      : 400;
+    return res.status(status).json({ error: error.message });
+  }
+}
+
+module.exports = { crear, cancelar, misReservas, historial, checkin };
