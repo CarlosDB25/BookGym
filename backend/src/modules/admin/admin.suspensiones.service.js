@@ -4,6 +4,9 @@ async function listarSuspensiones(activas) {
   const where = {};
   if (activas === 'true') {
     where.activa = true;
+    where.fechaFin = { gte: new Date() };
+  } else if (activas === 'false') {
+    where.activa = false;
   }
 
   const suspensiones = await prisma.suspension.findMany({
