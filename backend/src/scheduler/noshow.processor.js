@@ -133,25 +133,38 @@ async function procesarNoShows() {
       continue;
     }
 
-    const suspensionActiva = await prisma.suspension.findFirst({
-      where: {
-        idUsuario,
-        activa: true,
-        fechaFin: { gte: new Date() },
-      },
-    });
-
-    if (suspensionActiva) {
-      console.log(
-        `[NoShow] usuario=${idUsuario} ya tiene suspension activa (id=${suspensionActiva.id}) -> se omite`
-      );
-      continue;
-    }
-
     try {
-      const resultado = await prisma.$transaction(async (tx) => {
-        return aplicarSuspension(tx, idUsuario, `Suspension automatica por ${totalNoShows} inasistencias (umbral ${umbral})`);
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      const resultado = await prisma.$transaction(
+        async (tx) => {
+          const suspensionActiva = await tx.suspension.findFirst({
+            where: {
+              idUsuario,
+              activa: true,
+              fechaFin: { gte: new Date() },
+            },
+          });
+
+          if (suspensionActiva) {
+            return { suspensionActiva };
+          }
+
+          const aplicado = await aplicarSuspension(
+            tx,
+            idUsuario,
+            `Suspension automatica por ${totalNoShows} inasistencias (umbral ${umbral})`
+          );
+
+          return { suspensionActiva: null, ...aplicado };
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+      );
+
+      if (resultado.suspensionActiva) {
+        console.log(
+          `[NoShow] usuario=${idUsuario} ya tiene suspension activa (id=${resultado.suspensionActiva.id}) -> se omite`
+        );
+        continue;
+      }
 
       suspendidos.push({
         idUsuario,
