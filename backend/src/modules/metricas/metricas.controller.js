@@ -2,8 +2,9 @@ const service = require('./metricas.service');
 
 function validarFecha(fecha) {
   if (!fecha) return true;
-  const d = new Date(`${fecha}T00:00:00`);
-  return !isNaN(d.getTime());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return false;
+  const d = new Date(`${fecha}T00:00:00Z`);
+  return !isNaN(d.getTime()) && d.toISOString().slice(0, 10) === fecha;
 }
 
 async function resumen(req, res) {
