@@ -265,7 +265,10 @@ export function ScannerHub({ onNotice }) {
             <p className="text-sm text-warning-700">
               El estudiante no posee reservas agendadas para este bloque horario.
             </p>
-            <button className="flex items-center justify-center gap-2 rounded-2xl border-2 border-warning-400 bg-white px-6 py-4 text-sm font-bold text-warning-700 transition hover:bg-warning-50">
+            <button
+              onClick={() => onNotice?.('info', 'Funcionalidad de sobrecupo en desarrollo')}
+              className="flex items-center justify-center gap-2 rounded-2xl border-2 border-warning-400 bg-white px-6 py-4 text-sm font-bold text-warning-700 transition hover:bg-warning-50"
+            >
               <IconUser className="h-5 w-5" />
               Ingreso por Sobrecupo Administrativo
             </button>

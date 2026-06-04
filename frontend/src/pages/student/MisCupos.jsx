@@ -33,8 +33,10 @@ export function MisCupos({ onNotice }) {
     return reservas.map((r) => {
       const franja = r.franja || {}
       const plantilla = franja.plantilla || {}
-      const inicio = parseSlotMillis(franja.fecha, plantilla.horaInicio)
-      const fin = parseSlotMillis(franja.fecha, plantilla.horaFin)
+      const horaInicio = franja.horaInicio || plantilla.horaInicio
+      const horaFin = franja.horaFin || plantilla.horaFin
+      const inicio = parseSlotMillis(franja.fecha, horaInicio)
+      const fin = parseSlotMillis(franja.fecha, horaFin)
       const puedeCancelar = isWithinWindow(inicio, reglas?.anticipacionCancelacionMin || 30)
       const enVentanaCheckin =
         now >= inicio - windowCheckin * 60 * 1000 && now <= fin

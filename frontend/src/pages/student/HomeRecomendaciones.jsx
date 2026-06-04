@@ -1,3 +1,4 @@
+import { useAuth } from '../../hooks/useAuth'
 import { useReglasReserva } from '../../hooks/useReglasReserva'
 import { useRecomendaciones } from '../../hooks/useReservas'
 import { SaturacionBadge } from '../../components/ui/SaturacionBadge'
@@ -6,6 +7,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { IconSparkles, IconTrendingUp, IconArrowRight, IconClock, IconShieldAlert } from '../../components/shared/Icons'
 
 export function HomeRecomendaciones({ onNotice }) {
+  const { usuario } = useAuth()
   const { data: reglas, isLoading: loadingReglas } = useReglasReserva()
   const { data: recomendaciones, isLoading } = useRecomendaciones(5)
 
@@ -26,7 +28,7 @@ export function HomeRecomendaciones({ onNotice }) {
     <div className="space-y-6 pt-2">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Hola, <span className="text-primary">!</span></h1>
+          <h1 className="text-xl font-bold text-slate-900">Hola, <span className="text-primary">{usuario?.nombre || ''}</span></h1>
           <p className="text-sm text-slate-500">Estas son tus mejores opciones hoy</p>
         </div>
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success-50">

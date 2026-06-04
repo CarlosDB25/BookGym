@@ -17,30 +17,6 @@ import { AdminUsuarios } from './pages/admin/AdminUsuarios'
 import { AdminConfig } from './pages/admin/AdminConfig'
 import { Toast } from './components/ui/Toast'
 
-function ProtectedRoute({ children, rol }) {
-  const stored = localStorage.getItem('usuario')
-  const user = stored ? JSON.parse(stored) : null
-  if (!user) return <Navigate to="/login" replace />
-  if (rol && user.rol !== rol) return <Navigate to={user.rol === 'administrador' ? '/admin' : '/home'} replace />
-  return children
-}
-
-function StudentGuard() {
-  const stored = localStorage.getItem('usuario')
-  const user = stored ? JSON.parse(stored) : null
-  if (!user) return <Navigate to="/login" replace />
-  if (user.rol !== 'estudiante') return <Navigate to="/admin" replace />
-  return null
-}
-
-function AdminGuard() {
-  const stored = localStorage.getItem('usuario')
-  const user = stored ? JSON.parse(stored) : null
-  if (!user) return <Navigate to="/login" replace />
-  if (user.rol !== 'administrador') return <Navigate to="/home" replace />
-  return null
-}
-
 function App() {
   const { usuario, login, logout } = useAuth()
   const [notice, setNotice] = useState(null)

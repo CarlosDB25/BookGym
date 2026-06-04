@@ -10,6 +10,10 @@ const TABS = [
   { id: 'plantillas', label: 'Gestión de Plantillas', icon: IconSliders },
 ]
 
+function toSnakeCase(str) {
+  return str.replace(/([A-Z])/g, '_$1').toLowerCase()
+}
+
 const FIELD_META = {
   limiteReservasActivas: { label: 'Límite de reservas activas', icon: IconUsers, min: 1, max: 10, tab: 'reserva' },
   maxReservasPorDia: { label: 'Máximo reservas por día', icon: IconCalendar, min: 1, max: 5, tab: 'reserva' },
@@ -41,10 +45,6 @@ export function AdminConfig({ onNotice }) {
     const num = Math.max(0, Math.floor(Number(value) || 0))
     setFormValues((prev) => ({ ...prev, [key]: num }))
     setHasChanges(true)
-  }
-
-  function toSnakeCase(str) {
-    return str.replace(/([A-Z])/g, '_$1').toLowerCase()
   }
 
   async function handleSave() {

@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Environment files (use .env.example as template)
+.env
+.env.production
+.env.development
+.env.staging
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,6 +28,5 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
 
 Front base
