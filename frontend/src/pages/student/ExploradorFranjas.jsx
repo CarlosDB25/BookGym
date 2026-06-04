@@ -10,12 +10,30 @@ import {
   todayYMD,
   mondayFromYMD,
   formatDayHeader,
+  now,
 } from '../../utils/time'
 import { IconCalendar, IconX } from '../../components/shared/Icons'
 
 export function ExploradorFranjas({ onNotice }) {
   const lunes = useMemo(() => mondayFromYMD(todayYMD()), [])
-  const [selectedDay, setSelectedDay] = useState(todayYMD())
+
+  const weekDays = useMemo(() => {
+    const days = []
+    for (let i = 0; i < 5; i++) {
+      const date = new Date(lunes)
+      date.setDate(date.getDate() + i)
+      days.push(date.toISOString().split('T')[0])
+    }
+    return days
+  }, [lunes])
+
+  const defaultDayIndex = useMemo(() => {
+    const d = now().day()
+    if (d === 0 || d === 6) return 0
+    return d - 1
+  }, [])
+
+  const [selectedDay, setSelectedDay] = useState(weekDays[defaultDayIndex])
   const [modal, setModal] = useState({ open: false })
   const [pendiente, setPendiente] = useState(null)
 
@@ -23,16 +41,6 @@ export function ExploradorFranjas({ onNotice }) {
   const { data: reservas = [] } = useReservas()
   const { data: reglas } = useReglasReserva()
   const crearReserva = useCrearReserva()
-
-  const weekDays = useMemo(() => {
-    const days = []
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(lunes)
-      date.setDate(date.getDate() + i)
-      days.push(date.toISOString().split('T')[0])
-    }
-    return days
-  }, [lunes])
 
   const idsReservados = new Set(reservas.map((r) => r.idFranja))
   const maxActivas = reglas?.limiteReservasActivas || 3

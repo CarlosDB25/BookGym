@@ -72,8 +72,8 @@ function App() {
             }
           >
             <Route path="/home" element={<HomeRecomendaciones onNotice={showNotice} />} />
-            <Route path="/explorar" element={<ExploradorFranjas onNotice={showNotice} />} />
-            <Route path="/mis-cupos" element={<MisCupos onNotice={showNotice} />} />
+            <Route path="/reservar" element={<ExploradorFranjas onNotice={showNotice} />} />
+            <Route path="/mis-reservas" element={<MisCupos onNotice={showNotice} />} />
             <Route path="/perfil" element={<Perfil usuario={usuario} />} />
           </Route>
         )}

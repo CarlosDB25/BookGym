@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useReglasReserva } from '../../hooks/useReglasReserva'
 import { useActualizarReglas, usePlantillas, useActualizarPlantilla, useAuditLog } from '../../hooks/useAdmin'
 import { CardSkeleton } from '../../components/ui/SkeletonLoader'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { IconSettings, IconSave, IconClock, IconAlertTriangle, IconCalendar, IconUsers, IconBan, IconUserX, IconSliders, IconHistory } from '../../components/shared/Icons'
+import { IconSave, IconClock, IconAlertTriangle, IconCalendar, IconUsers, IconBan, IconUserX, IconSliders, IconHistory } from '../../components/shared/Icons'
 
 const TABS = [
   { id: 'reserva', label: 'Reglas de Reserva', icon: IconCalendar },
@@ -67,99 +68,108 @@ function ReservaTab({ fields, formValues, reglas, handleChange }) {
   )
 }
 
-function PlantillaRow({ plantilla, onEdit, editando, onChange, onGuardar, guardando }) {
-  const editing = editando?.id === plantilla.id
+function PlantillaCard({ plantilla, onNotice }) {
+  const queryClient = useQueryClient()
+  const actualizarPlantilla = useActualizarPlantilla()
+  const [horaInicio, setHoraInicio] = useState(plantilla.horaInicio)
+  const [horaFin, setHoraFin] = useState(plantilla.horaFin)
+  const [capacidadMaxima, setCapacidadMaxima] = useState(plantilla.capacidadMaxima)
+  const [guardando, setGuardando] = useState(false)
+
+  async function handleGuardar() {
+    setGuardando(true)
+    try {
+      await actualizarPlantilla.mutateAsync({
+        id: plantilla.id,
+        horaInicio,
+        horaFin,
+        capacidadMaxima: Number(capacidadMaxima),
+      })
+      queryClient.invalidateQueries({ queryKey: ['plantillas'] })
+      onNotice?.('success', 'Plantilla actualizada')
+    } catch (err) {
+      onNotice?.('error', err?.response?.data?.error || 'Error al actualizar')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function handleToggleActiva() {
+    try {
+      await actualizarPlantilla.mutateAsync({
+        id: plantilla.id,
+        activa: !plantilla.activa,
+      })
+      queryClient.invalidateQueries({ queryKey: ['plantillas'] })
+      onNotice?.('success', `Plantilla ${plantilla.activa ? 'desactivada' : 'activada'}`)
+    } catch (err) {
+      onNotice?.('error', err?.response?.data?.error || 'Error al cambiar estado')
+    }
+  }
+
   return (
-    <div className="flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-4">
-      <div className="min-w-[90px]">
-        <span className="text-sm font-semibold capitalize text-slate-800">{plantilla.diaSemana}</span>
+    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-bold capitalize text-slate-800">{plantilla.diaSemana}</span>
+        <button
+          type="button"
+          onClick={handleToggleActiva}
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+            plantilla.activa ? 'bg-primary' : 'bg-slate-200'
+          }`}
+          role="switch"
+          aria-checked={plantilla.activa}
+        >
+          <span
+            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+              plantilla.activa ? 'translate-x-5' : 'translate-x-0.5'
+            }`}
+          />
+        </button>
       </div>
-      {editing ? (
-        <>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
           <input
             type="time"
-            value={onChange ? undefined : plantilla.horaInicio}
-            defaultValue={plantilla.horaInicio}
-            onChange={(e) => onChange('horaInicio', e.target.value)}
-            className="w-28 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+            value={horaInicio}
+            onChange={(e) => setHoraInicio(e.target.value)}
+            className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
           />
           <span className="text-slate-400">—</span>
           <input
             type="time"
-            value={onChange ? undefined : plantilla.horaFin}
-            defaultValue={plantilla.horaFin}
-            onChange={(e) => onChange('horaFin', e.target.value)}
-            className="w-28 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
+            value={horaFin}
+            onChange={(e) => setHoraFin(e.target.value)}
+            className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
           />
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-slate-500">Capacidad:</label>
           <input
             type="number"
-            defaultValue={plantilla.capacidadMaxima}
-            onChange={(e) => onChange('capacidadMaxima', e.target.value)}
+            value={capacidadMaxima}
+            onChange={(e) => setCapacidadMaxima(e.target.value)}
             className="w-20 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
             min={1}
           />
-          <button
-            onClick={onGuardar}
-            disabled={guardando}
-            className="rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
-          >
-            {guardando ? '...' : 'Guardar'}
-          </button>
-        </>
-      ) : (
-        <>
-          <span className="text-sm font-medium text-slate-700">{plantilla.horaInicio}</span>
-          <span className="text-slate-400">—</span>
-          <span className="text-sm text-slate-700">{plantilla.horaFin}</span>
-          <span className="ml-auto text-sm text-slate-600">
-            Cap. <strong>{plantilla.capacidadMaxima}</strong>
-          </span>
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
-            plantilla.activa ? 'bg-success-50 text-success-700' : 'bg-slate-100 text-slate-500'
-          }`}>
-            {plantilla.activa ? 'Activa' : 'Inactiva'}
-          </span>
-          <button
-            onClick={() => onEdit(plantilla)}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
-          >
-            <IconSettings className="h-4 w-4" />
-          </button>
-        </>
-      )}
+        </div>
+        <button
+          onClick={handleGuardar}
+          disabled={guardando}
+          className="w-full rounded-lg bg-primary py-1.5 text-xs font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
+        >
+          {guardando ? 'Guardando...' : 'Guardar'}
+        </button>
+      </div>
     </div>
   )
 }
 
 function PlantillasTab({ onNotice }) {
   const { data: plantillas = [], isLoading } = usePlantillas()
-  const actualizarPlantilla = useActualizarPlantilla()
-  const [editando, setEditando] = useState(null)
-  const [editForm, setEditForm] = useState({})
-
-  function handleEdit(p) {
-    setEditando(p)
-    setEditForm({ horaInicio: p.horaInicio, horaFin: p.horaFin, capacidadMaxima: p.capacidadMaxima })
-  }
-
-  function handleChange(field, value) {
-    setEditForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  async function handleGuardar() {
-    if (!editando) return
-    try {
-      await actualizarPlantilla.mutateAsync({ id: editando.id, ...editForm })
-      onNotice?.('success', 'Plantilla actualizada')
-      setEditando(null)
-      setEditForm({})
-    } catch (err) {
-      onNotice?.('error', err?.response?.data?.error || 'Error al actualizar')
-    }
-  }
 
   if (isLoading) {
-    return <div className="space-y-3"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div>
+    return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div>
   }
 
   if (plantillas.length === 0) {
@@ -172,31 +182,10 @@ function PlantillasTab({ onNotice }) {
     )
   }
 
-  const grouped = {}
-  for (const p of plantillas) {
-    if (!grouped[p.diaSemana]) grouped[p.diaSemana] = []
-    grouped[p.diaSemana].push(p)
-  }
-
   return (
-    <div className="space-y-6">
-      {Object.entries(grouped).map(([dia, items]) => (
-        <div key={dia}>
-          <h4 className="mb-2 text-sm font-bold capitalize text-slate-700">{dia}</h4>
-          <div className="space-y-2">
-            {items.map((p) => (
-              <PlantillaRow
-                key={p.id}
-                plantilla={p}
-                onEdit={handleEdit}
-                editando={editando && editando.id === p.id ? editando : null}
-                onChange={handleChange}
-                onGuardar={handleGuardar}
-                guardando={actualizarPlantilla.isPending}
-              />
-            ))}
-          </div>
-        </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {plantillas.map((p) => (
+        <PlantillaCard key={p.id} plantilla={p} onNotice={onNotice} />
       ))}
     </div>
   )

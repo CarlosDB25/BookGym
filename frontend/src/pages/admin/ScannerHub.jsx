@@ -90,11 +90,18 @@ export function ScannerHub({ onNotice }) {
 
   useEffect(() => {
     const containerEl = scannerContainerRef.current
+    if (!containerEl || scannerRef.current) return
+
     let mounted = true
     let instance
+
+    const scannerDiv = document.createElement('div')
+    scannerDiv.id = 'scanner-view-' + Date.now()
+    containerEl.appendChild(scannerDiv)
+
     async function startScanner() {
       try {
-        instance = new Html5Qrcode('scanner-view')
+        instance = new Html5Qrcode(scannerDiv.id)
         await instance.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 250, height: 150 } },
@@ -107,7 +114,7 @@ export function ScannerHub({ onNotice }) {
           () => {}
         )
         if (!mounted) {
-          instance.stop().catch(() => {})
+          await instance.stop().catch(() => {})
           return
         }
         scannerRef.current = instance
@@ -117,22 +124,23 @@ export function ScannerHub({ onNotice }) {
         if (mounted) setScanning(false)
       }
     }
+
     startScanner()
+
     return () => {
       mounted = false
-      const curr = instance || scannerRef.current
       scannerRef.current = null
-      if (curr) {
-        curr.stop()
-          .catch(() => {})
-          .finally(() => {
-            if (containerEl) {
-              try { containerEl.innerHTML = '' } catch {}
-            }
-          })
-      } else if (containerEl) {
-        try { containerEl.innerHTML = '' } catch {}
-      }
+      ;(async () => {
+        try {
+          if (instance) {
+            await instance.stop()
+            await instance.clear()
+          }
+        } catch {}
+        if (containerEl && scannerDiv.parentNode === containerEl) {
+          containerEl.removeChild(scannerDiv)
+        }
+      })()
     }
   }, [])
 
@@ -141,7 +149,6 @@ export function ScannerHub({ onNotice }) {
       <div className="col-span-5 flex flex-col gap-4">
         <div
           ref={scannerContainerRef}
-          id="scanner-view"
           className={`relative aspect-video overflow-hidden rounded-2xl bg-slate-900 ${
             flashGreen ? 'ring-4 ring-success-400' : ''
           }`}

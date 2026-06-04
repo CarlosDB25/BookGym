@@ -1,20 +1,34 @@
 import { useAuth } from '../../hooks/useAuth'
 import { useReglasReserva } from '../../hooks/useReglasReserva'
-import { useRecomendaciones } from '../../hooks/useReservas'
+import { useReservas, useRecomendaciones } from '../../hooks/useReservas'
 import { SaturacionBadge } from '../../components/ui/SaturacionBadge'
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { IconSparkles, IconTrendingUp, IconArrowRight, IconClock, IconShieldAlert } from '../../components/shared/Icons'
+import { IconSparkles, IconTrendingUp, IconArrowRight, IconClock, IconShieldAlert, IconCalendarCheck } from '../../components/shared/Icons'
+import { formatDate, nowMillis, parseSlotMillis } from '../../utils/time'
 
 export function HomeRecomendaciones({ onNotice }) {
   const { usuario } = useAuth()
   const { data: reglas, isLoading: loadingReglas } = useReglasReserva()
   const { data: recomendaciones, isLoading } = useRecomendaciones(5)
+  const { data: reservasActivas = [], isLoading: loadingReservas } = useReservas()
 
   const mejoresMomentos = recomendaciones?.mejoresMomentos ?? []
   const evitando = recomendaciones?.evitando ?? []
 
-  if (isLoading || loadingReglas) {
+  const ahora = nowMillis()
+  const proximaReserva = reservasActivas
+    .filter(r => {
+      const inicio = parseSlotMillis(r.franja?.fecha, r.franja?.horaInicio || r.franja?.plantilla?.horaInicio)
+      return inicio > ahora
+    })
+    .sort((a, b) => {
+      const aInicio = parseSlotMillis(a.franja?.fecha, a.franja?.horaInicio || a.franja?.plantilla?.horaInicio)
+      const bInicio = parseSlotMillis(b.franja?.fecha, b.franja?.horaInicio || b.franja?.plantilla?.horaInicio)
+      return aInicio - bInicio
+    })[0]
+
+  if (isLoading || loadingReglas || loadingReservas) {
     return (
       <div className="space-y-4 pt-4">
         <SkeletonLoader className="h-8 w-2/3" />
@@ -26,6 +40,32 @@ export function HomeRecomendaciones({ onNotice }) {
 
   return (
     <div className="space-y-6 pt-2">
+      {proximaReserva ? (
+        <div className="rounded-xl border border-primary/20 bg-primary-50 p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+              <IconCalendarCheck className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-900">Tu próxima reserva</p>
+              <p className="text-sm text-slate-600">
+                {proximaReserva.franja?.plantilla?.diaSemana || proximaReserva.franja?.diaSemana || ''} · {formatDate(proximaReserva.franja?.fecha)}
+              </p>
+              <p className="text-sm font-medium text-primary">
+                {proximaReserva.franja?.horaInicio || proximaReserva.franja?.plantilla?.horaInicio || ''} - {proximaReserva.franja?.horaFin || proximaReserva.franja?.plantilla?.horaFin || ''}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-primary/20 bg-primary-50/50 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <IconCalendarCheck className="h-4 w-4 text-slate-400" />
+            <span>No tienes reservas próximas</span>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-900">Hola, <span className="text-primary">{usuario?.nombre || ''}</span></h1>

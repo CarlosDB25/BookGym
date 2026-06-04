@@ -1,13 +1,12 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { IconSparkles, IconCalendar, IconTicket, IconUser } from '../components/shared/Icons'
 import { Logo } from '../components/shared/Logo'
 
-const tabs = [
-  { path: '/home', label: 'Recomendados', icon: IconSparkles },
-  { path: '/explorar', label: 'Explorar', icon: IconCalendar },
-  { path: '/mis-cupos', label: 'Mis Cupos', icon: IconTicket },
-  { path: '/perfil', label: 'Perfil', icon: IconUser },
+const navItems = [
+  { path: '/home', label: 'Recomendados', icon: 'auto_awesome' },
+  { path: '/reservar', label: 'Reservar', icon: 'calendar_today' },
+  { path: '/mis-reservas', label: 'Mis Cupos', icon: 'confirmation_number' },
+  { path: '/perfil', label: 'Perfil', icon: 'person' },
 ]
 
 export function StudentMobileLayout({ usuario, onLogout }) {
@@ -47,14 +46,14 @@ export function StudentMobileLayout({ usuario, onLogout }) {
       </main>
 
       <nav className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md border-t border-slate-200 bg-white/90 backdrop-blur-lg">
-        <div className="flex items-stretch">
-          {tabs.map(({ path, label, icon: Icon }) => {
+        <div className="relative flex items-stretch">
+          {navItems.map(({ path, label, icon }) => {
             const isActive = location.pathname === path
             return (
-              <NavLink
+              <Link
                 key={path}
                 to={path}
-                className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2"
+                className="relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2"
               >
                 {isActive && (
                   <motion.div
@@ -63,19 +62,22 @@ export function StudentMobileLayout({ usuario, onLogout }) {
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                   />
                 )}
-                <Icon
-                  className={`h-5 w-5 transition-colors ${
+                <span
+                  className={`material-symbols-outlined text-2xl transition-colors ${
                     isActive ? 'text-primary' : 'text-slate-400'
                   }`}
-                />
+                  style={{ fontVariationSettings: `'FILL' ${isActive ? 1 : 0}` }}
+                >
+                  {icon}
+                </span>
                 <span
-                  className={`text-[10px] font-medium transition-colors ${
-                    isActive ? 'text-primary' : 'text-slate-400'
+                  className={`text-[10px] transition-colors ${
+                    isActive ? 'font-bold text-primary' : 'font-medium text-slate-400'
                   }`}
                 >
                   {label}
                 </span>
-              </NavLink>
+              </Link>
             )
           })}
         </div>
