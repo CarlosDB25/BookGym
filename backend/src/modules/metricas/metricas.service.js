@@ -61,136 +61,325 @@ async function recomendaciones(limite = 5, usuarioId = null) {
   const ahora = new Date();
   const inicioHistorial = new Date(ahora);
   inicioHistorial.setDate(inicioHistorial.getDate() - 90);
-  const puntoMedio = new Date(ahora);
-  puntoMedio.setDate(puntoMedio.getDate() - 45);
+  const hace30 = new Date(ahora);
+  hace30.setDate(hace30.getDate() - 30);
+  const hace60 = new Date(ahora);
+  hace60.setDate(hace60.getDate() - 60);
 
-  const [franjas, franjasActuales] = await withTimeout(Promise.all([
+  const proximasFechas = [];
+  let cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  while (proximasFechas.length < 5) {
+    const day = cursor.getDay();
+    if (day >= 1 && day <= 5) {
+      proximasFechas.push(new Date(cursor));
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  const minProxima = proximasFechas[0];
+  const maxProxima = new Date(proximasFechas[proximasFechas.length - 1]);
+  maxProxima.setDate(maxProxima.getDate() + 1);
+
+  const [franjasHistoricas, franjasFuturas, reservasUsuario] = await withTimeout(Promise.all([
     prisma.franja.findMany({
       where: { fecha: { gte: inicioHistorial, lt: ahora } },
-      include: { plantilla: true, reservas: { where: { estado: { not: 'cancelada' } }, select: { id: true } } },
+      include: {
+        plantilla: true,
+        reservas: {
+          where: { estado: { not: 'cancelada' } },
+          select: { id: true, estado: true, idUsuario: true, asistencia: { select: { resultado: true } } },
+        },
+      },
     }),
     prisma.franja.findMany({
-      where: { fecha: { gte: parseMonday(), lt: (() => { const f = parseMonday(); f.setDate(f.getDate() + 5); return f; })() } },
-      include: { plantilla: true, reservas: { where: { estado: { not: 'cancelada' } }, select: { id: true } } },
+      where: {
+        fecha: { gte: minProxima, lt: maxProxima },
+        plantilla: { activa: true },
+      },
+      include: {
+        plantilla: true,
+        reservas: { where: { estado: { not: 'cancelada' } }, select: { id: true } },
+      },
+      orderBy: [{ fecha: 'asc' }, { plantilla: { horaInicio: 'asc' } }],
     }),
+    usuarioId
+      ? prisma.reserva.findMany({
+          where: { idUsuario: usuarioId },
+          include: {
+            franja: { include: { plantilla: true } },
+            asistencia: { select: { resultado: true } },
+          },
+          orderBy: { fechaCreacion: 'desc' },
+        })
+      : Promise.resolve([]),
   ]));
 
-  const gruposGlobales = agruparSaturacion(franjas);
-  const gruposRecientes = agruparSaturacion(franjas.filter(f => f.fecha >= puntoMedio));
-  const gruposAntiguos = agruparSaturacion(franjas.filter(f => f.fecha < puntoMedio));
-
-  const disponibilidadActual = {};
-  const inicioSemana = parseMonday();
-  for (const f of franjasActuales) {
+  const slotStats = {};
+  for (const f of franjasHistoricas) {
     const key = `${f.plantilla.diaSemana}_${f.plantilla.horaInicio}`;
-    if (!disponibilidadActual[key]) disponibilidadActual[key] = { disponible: false, cuposRestantes: 0, fecha: null };
-    const libres = f.plantilla.capacidadMaxima - f.reservas.length;
-    if (libres > 0) {
-      disponibilidadActual[key].disponible = true;
-      disponibilidadActual[key].cuposRestantes += libres;
-      if (!disponibilidadActual[key].fecha) disponibilidadActual[key].fecha = f.fecha.toISOString().slice(0, 10);
-    }
-  }
-
-  let preferenciasUsuario = null;
-  if (usuarioId) {
-    const reservasUsuario = await withTimeout(prisma.reserva.findMany({
-      where: { idUsuario: usuarioId, estado: { not: 'cancelada' } },
-      include: { franja: { include: { plantilla: true } } },
-      take: 20,
-      orderBy: { fechaCreacion: 'desc' },
-    }));
-    if (reservasUsuario.length > 0) {
-      const dias = {};
-      const horas = {};
-      for (const r of reservasUsuario) {
-        dias[r.franja.plantilla.diaSemana] = (dias[r.franja.plantilla.diaSemana] || 0) + 1;
-        horas[r.franja.plantilla.horaInicio] = (horas[r.franja.plantilla.horaInicio] || 0) + 1;
-      }
-      preferenciasUsuario = {
-        diasFrecuentes: Object.entries(dias).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]),
-        horaHabitual: Object.entries(horas).sort((a, b) => b[1] - a[1])[0]?.[0],
+    if (!slotStats[key]) {
+      slotStats[key] = {
+        key,
+        dia: f.plantilla.diaSemana,
+        horaInicio: f.plantilla.horaInicio,
+        capacidad: f.plantilla.capacidadMaxima,
+        ocurrencias: 0,
+        totalReservas: 0,
+        completadas: 0,
+        noShows: 0,
+        capacidadHistorica: 0,
+        reservadasHistoricas: 0,
+        ultimas30_ocurrencias: 0,
+        ultimas30_reservadas: 0,
       };
     }
+    const s = slotStats[key];
+    s.ocurrencias += 1;
+    s.capacidadHistorica += f.plantilla.capacidadMaxima;
+    s.reservadasHistoricas += f.reservas.length;
+    for (const r of f.reservas) {
+      s.totalReservas += 1;
+      if (r.estado === 'completada' || r.asistencia?.resultado === 'presente') s.completadas += 1;
+      else if (r.estado === 'no_show' || r.asistencia?.resultado === 'no_show') s.noShows += 1;
+    }
+    if (f.fecha >= hace30) {
+      s.ultimas30_ocurrencias += 1;
+      s.ultimas30_reservadas += f.reservas.length;
+    }
   }
 
-  const slots = Object.values(gruposGlobales).map(g => {
-    const key = `${g.dia}_${g.horaInicio}`;
-    const gr = gruposRecientes[key];
-    const ga = gruposAntiguos[key];
-    const actual = disponibilidadActual[key];
-    const saturacion = calcSaturacion(g);
+  let perfilUsuario = null;
+  if (usuarioId && reservasUsuario.length > 0) {
+    const total = reservasUsuario.length;
+    const completadas = reservasUsuario.filter((r) => r.estado === 'completada' || r.asistencia?.resultado === 'presente').length;
+    const noShows = reservasUsuario.filter((r) => r.estado === 'no_show' || r.asistencia?.resultado === 'no_show').length;
+    const canceladas = reservasUsuario.filter((r) => r.estado === 'cancelada').length;
 
-    let tendencia = 'estable';
-    if (gr && ga) {
-      const sr = calcSaturacion(gr);
-      const sa = calcSaturacion(ga);
-      if (sr - sa > 10) tendencia = 'subiendo';
-      else if (sa - sr > 10) tendencia = 'bajando';
+    const diaFreq = {};
+    const horaFreq = {};
+    const slotFreq = {};
+    for (const r of reservasUsuario) {
+      if (r.estado === 'cancelada') continue;
+      const dia = r.franja.plantilla.diaSemana;
+      const hora = r.franja.plantilla.horaInicio;
+      const slot = `${dia}_${hora}`;
+      diaFreq[dia] = (diaFreq[dia] || 0) + 1;
+      horaFreq[hora] = (horaFreq[hora] || 0) + 1;
+      slotFreq[slot] = (slotFreq[slot] || 0) + 1;
     }
 
-    let afinidad = 'neutra';
-    if (preferenciasUsuario) {
-      if (preferenciasUsuario.diasFrecuentes.includes(g.dia) && g.horaInicio === preferenciasUsuario.horaHabitual) {
-        afinidad = 'alta';
-      } else if (preferenciasUsuario.diasFrecuentes.includes(g.dia)) {
-        afinidad = 'media';
+    const diasOrdenados = Object.entries(diaFreq).sort((a, b) => b[1] - a[1]);
+    const horasOrdenadas = Object.entries(horaFreq).sort((a, b) => b[1] - a[1]);
+    const slotsOrdenados = Object.entries(slotFreq).sort((a, b) => b[1] - a[1]);
+
+    const noShowPorHora = {};
+    for (const r of reservasUsuario) {
+      if (r.estado === 'no_show' || r.asistencia?.resultado === 'no_show') {
+        const h = r.franja.plantilla.horaInicio;
+        noShowPorHora[h] = (noShowPorHora[h] || 0) + 1;
       }
     }
 
-    return {
-      dia: g.dia, horaInicio: g.horaInicio, saturacionHistorica: saturacion,
-      clasificacion: saturacion > 80 ? 'pico' : 'valle', tendencia,
-      ocurrencias: g.ocurrencias, disponibleEstaSemana: actual ? actual.disponible : false,
-      cuposRestantes: actual ? actual.cuposRestantes : 0, fechaProxima: actual?.fecha || null, afinidad,
+    perfilUsuario = {
+      totalReservas: total,
+      completadas,
+      noShows,
+      canceladas,
+      tasaAsistencia: total > 0 ? Math.round((completadas / total) * 100) : 0,
+      tasaNoShow: total > 0 ? Math.round((noShows / total) * 100) : 0,
+      diaFavorito: diasOrdenados[0]?.[0] || null,
+      diaFavoritoPct: diasOrdenados[0] ? Math.round((diasOrdenados[0][1] / total) * 100) : 0,
+      horaFavorita: horasOrdenadas[0]?.[0] || null,
+      horaFavoritaPct: horasOrdenadas[0] ? Math.round((horasOrdenadas[0][1] / total) * 100) : 0,
+      slotFavorito: slotsOrdenados[0]?.[0] || null,
+      slotFavoritoVeces: slotsOrdenados[0]?.[1] || 0,
+      diasFrecuentes: diasOrdenados.slice(0, 3).map(([d, c]) => ({ dia: d, count: c, pct: Math.round((c / total) * 100) })),
+      horasFrecuentes: horasOrdenadas.slice(0, 3).map(([h, c]) => ({ hora: h, count: c, pct: Math.round((c / total) * 100) })),
+      slotsFrecuentes: slotsOrdenados.slice(0, 5).map(([s, c]) => ({ slot: s, count: c })),
+      horasConNoShow: Object.entries(noShowPorHora).map(([h, c]) => ({ hora: h, noShows: c })),
+      historialRelevante: total,
     };
-  });
+  }
 
-  const mejoresMomentos = slots
-    .filter(s => s.clasificacion === 'valle' && s.disponibleEstaSemana)
-    .sort((a, b) => a.saturacionHistorica - b.saturacionHistorica)
+  function scoreFranja(franja) {
+    const key = `${franja.plantilla.diaSemana}_${franja.plantilla.horaInicio}`;
+    const stat = slotStats[key];
+    const libres = franja.plantilla.capacidadMaxima - franja.reservas.length;
+
+    let score = 0;
+    let razones = [];
+    let penalizaciones = [];
+
+    if (perfilUsuario) {
+      const diaCount = (perfilUsuario.diasFrecuentes.find((d) => d.dia === franja.plantilla.diaSemana)?.count) || 0;
+      const diaPct = perfilUsuario.totalReservas > 0 ? diaCount / perfilUsuario.totalReservas : 0;
+      const diaPuntos = Math.round(diaPct * 30);
+      score += diaPuntos;
+      if (diaPuntos >= 15) razones.push(`Sueles reservar los ${franja.plantilla.diaSemana} (${Math.round(diaPct * 100)}% de tu historial)`);
+
+      const horaCount = (perfilUsuario.horasFrecuentes.find((h) => h.hora === franja.plantilla.horaInicio)?.count) || 0;
+      const horaPct = perfilUsuario.totalReservas > 0 ? horaCount / perfilUsuario.totalReservas : 0;
+      const horaPuntos = Math.round(horaPct * 30);
+      score += horaPuntos;
+      if (horaPuntos >= 15) razones.push(`Las ${franja.plantilla.horaInicio} es tu hora habitual (${Math.round(horaPct * 100)}% de tus reservas)`);
+
+      const slotCount = (perfilUsuario.slotsFrecuentes.find((s) => s.slot === key)?.count) || 0;
+      if (slotCount >= 2) {
+        const bonus = Math.min(20, slotCount * 7);
+        score += bonus;
+        razones.push(`Has reservado este horario ${slotCount} veces antes`);
+      } else if (slotCount === 1) {
+        score += 5;
+        razones.push(`Ya probaste este horario antes`);
+      }
+
+      const noShowEnHora = perfilUsuario.horasConNoShow.find((h) => h.hora === franja.plantilla.horaInicio);
+      if (noShowEnHora) {
+        const penal = noShowEnHora.noShows * 5;
+        score -= penal;
+        penalizaciones.push(`Tienes ${noShowEnHora.noShows} no-show(s) a esta hora`);
+      }
+    }
+
+    if (stat) {
+      const ocupacionHistorica = stat.capacidadHistorica > 0
+        ? stat.reservadasHistoricas / stat.capacidadHistorica
+        : 0;
+      const ocupacionPct = Math.round(ocupacionHistorica * 100);
+      const ocupacionPuntos = Math.round((1 - ocupacionHistorica) * 15);
+      score += ocupacionPuntos;
+      if (ocupacionHistorica < 0.4) razones.push(`Ocupación histórica baja: ${ocupacionPct}%`);
+      else if (ocupacionHistorica >= 0.85) penalizaciones.push(`Casi siempre lleno: ${ocupacionPct}% de ocupación`);
+
+      if (stat.totalReservas > 0) {
+        const tasaAsistenciaSlot = stat.completadas / stat.totalReservas;
+        if (tasaAsistenciaSlot >= 0.9) {
+          score += 3;
+          razones.push(`Alta tasa de asistencia: ${Math.round(tasaAsistenciaSlot * 100)}%`);
+        }
+      }
+
+      if (stat.ultimas30_ocurrencias > 0) {
+        const ocupacionReciente = stat.ultimas30_reservadas / (stat.ultimas30_ocurrencias * stat.capacidad);
+        if (ocupacionReciente < ocupacionHistorica - 0.15) {
+          razones.push('Tendencia a bajar: cada vez hay más espacio');
+          score += 4;
+        } else if (ocupacionReciente > ocupacionHistorica + 0.15) {
+          penalizaciones.push('Tendencia a subir: reserva pronto');
+          score -= 3;
+        }
+      }
+    }
+
+    if (libres <= 0) {
+      score = -100;
+      penalizaciones.push('Sin cupos disponibles');
+    } else {
+      const capacidadFrac = libres / franja.plantilla.capacidadMaxima;
+      const capPuntos = Math.round(capacidadFrac * 10);
+      score += capPuntos;
+      if (capPuntos >= 7) razones.push(`${libres} cupos disponibles de ${franja.plantilla.capacidadMaxima}`);
+    }
+
+    let afinidad = 'nueva';
+    if (perfilUsuario) {
+      const slotCount = (perfilUsuario.slotsFrecuentes.find((s) => s.slot === key)?.count) || 0;
+      const diaCount = (perfilUsuario.diasFrecuentes.find((d) => d.dia === franja.plantilla.diaSemana)?.count) || 0;
+      const horaCount = (perfilUsuario.horasFrecuentes.find((h) => h.hora === franja.plantilla.horaInicio)?.count) || 0;
+      if (slotCount >= 2 || (diaCount >= 2 && horaCount >= 2)) afinidad = 'alta';
+      else if (diaCount >= 1 || horaCount >= 1) afinidad = 'media';
+    }
+
+    return { score, razones, penalizaciones, afinidad, ocupacionHistorica: stat ? Math.round((stat.reservadasHistoricas / Math.max(1, stat.capacidadHistorica)) * 100) : null };
+  }
+
+  const franjasEvaluadas = franjasFuturas
+    .filter((f) => {
+      const inicioTurno = inicioFranjaBogota(f.fecha, f.plantilla.horaInicio);
+      const limiteReserva = new Date(inicioTurno.getTime() - 30 * 60 * 1000);
+      return ahora < limiteReserva;
+    })
+    .map((f) => {
+      const { score, razones, penalizaciones, afinidad, ocupacionHistorica } = scoreFranja(f);
+      return {
+        id: f.id,
+        fecha: f.fecha.toISOString().slice(0, 10),
+        dia: f.plantilla.diaSemana,
+        horaInicio: f.plantilla.horaInicio,
+        horaFin: f.plantilla.horaFin,
+        cuposRestantes: f.plantilla.capacidadMaxima - f.reservas.length,
+        capacidadMaxima: f.plantilla.capacidadMaxima,
+        score,
+        afinidad,
+        ocupacionHistorica,
+        razones,
+        penalizaciones,
+      };
+    });
+
+  const mejoresMomentos = franjasEvaluadas
+    .filter((f) => f.cuposRestantes > 0)
+    .sort((a, b) => b.score - a.score)
     .slice(0, limite)
-    .map(s => ({
-      dia: s.dia, horaInicio: s.horaInicio, saturacionHistorica: s.saturacionHistorica,
-      tendencia: s.tendencia, cuposRestantes: s.cuposRestantes, fechaProxima: s.fechaProxima,
-      afinidad: s.afinidad,
-      razon: s.afinidad === 'alta'
-        ? 'Coincide con tus horarios habituales y tiene baja saturación histórica'
-        : s.afinidad === 'media'
-          ? 'Día que frecuentas y con buena disponibilidad actual'
-          : 'Baja ocupación histórica con cupos disponibles esta semana',
-    }));
+    .map((f) => {
+      const razonPrincipal = f.razones[0] || `${f.cuposRestantes} cupos disponibles`;
+      return {
+        id: f.id,
+        fecha: f.fecha,
+        dia: f.dia,
+        horaInicio: f.horaInicio,
+        horaFin: f.horaFin,
+        cuposRestantes: f.cuposRestantes,
+        capacidadMaxima: f.capacidadMaxima,
+        afinidad: f.afinidad,
+        score: f.score,
+        ocupacionHistorica: f.ocupacionHistorica,
+        razon: razonPrincipal,
+        todasRazones: f.razones,
+        penalizaciones: f.penalizaciones,
+      };
+    });
 
-  const evitando = slots
-    .filter(s => s.clasificacion === 'pico')
-    .sort((a, b) => b.saturacionHistorica - a.saturacionHistorica)
-    .slice(0, 5)
-    .map(s => ({
-      dia: s.dia, horaInicio: s.horaInicio, saturacionHistorica: s.saturacionHistorica,
-      tendencia: s.tendencia,
-      razon: s.saturacionHistorica > 90
-        ? 'Casi siempre al límite de capacidad, muy probable que no consigas cupo'
-        : 'Alta demanda histórica, difícil encontrar disponibilidad',
-    }));
+  const slotKeysTop = new Set(mejoresMomentos.map((m) => `${m.dia}_${m.horaInicio}`));
 
-  const alAlza = slots
-    .filter(s => s.tendencia === 'subiendo' && s.clasificacion === 'valle')
-    .sort((a, b) => b.saturacionHistorica - a.saturacionHistorica);
+  const evitando = Object.values(slotStats)
+    .map((s) => {
+      const libresPromedio = s.capacidad > 0
+        ? Math.max(0, s.capacidad - (s.reservadasHistoricas / Math.max(1, s.ocurrencias)))
+        : 0;
+      return {
+        dia: s.dia,
+        horaInicio: s.horaInicio,
+        ocupacionHistorica: Math.round((s.reservadasHistoricas / Math.max(1, s.capacidadHistorica)) * 100),
+        tasaAsistencia: s.totalReservas > 0 ? Math.round((s.completadas / s.totalReservas) * 100) : null,
+        razon: s.reservadasHistoricas / Math.max(1, s.capacidadHistorica) > 0.9
+          ? `Ocupación histórica del ${Math.round((s.reservadasHistoricas / Math.max(1, s.capacidadHistorica)) * 100)}% — casi siempre lleno`
+          : `Demanda alta y consistente: ${Math.round((s.reservadasHistoricas / Math.max(1, s.capacidadHistorica)) * 100)}% de ocupación`,
+      };
+    })
+    .filter((s) => !slotKeysTop.has(`${s.dia}_${s.horaInicio}`))
+    .sort((a, b) => b.ocupacionHistorica - a.ocupacionHistorica)
+    .slice(0, 5);
 
   const resultado = {
-    semanaAnalizada: inicioSemana.toISOString().slice(0, 10),
-    periodoHistorial: '90 dias',
-    totalSlotsAnalizados: slots.length,
+    periodoAnalizado: {
+      desde: minProxima.toISOString().slice(0, 10),
+      hasta: maxProxima.toISOString().slice(0, 10),
+      dias: 5,
+    },
+    periodoHistorial: 'ultimos 90 dias',
+    totalFranjasAnalizadas: franjasEvaluadas.length,
     mejoresMomentos,
     evitando,
   };
-  if (preferenciasUsuario) resultado.perfilUsuario = preferenciasUsuario;
-  if (alAlza.length > 0) {
-    resultado.conTendenciaAlza = alAlza.slice(0, 3).map(s => ({
-      dia: s.dia, horaInicio: s.horaInicio, saturacionHistorica: s.saturacionHistorica,
-      sugerencia: 'Este horario aún tiene baja saturación pero está en aumento. Reserva con anticipación.',
-    }));
+
+  if (perfilUsuario) resultado.perfilUsuario = perfilUsuario;
+  if (mejoresMomentos.length === 0) {
+    resultado.mensaje = perfilUsuario
+      ? 'No encontramos horarios que coincidan con tu perfil esta semana. Intenta explorar todas las franjas disponibles.'
+      : 'Reserva algunas sesiones para recibir recomendaciones personalizadas basadas en tu historial.';
   }
+
   return resultado;
 }
 

@@ -6,6 +6,7 @@ coverage
 
 # Test suite (local-only, not committed to main)
 __tests__
+jest.config.js
 
 # Debug helper scripts
 _debug_*.js

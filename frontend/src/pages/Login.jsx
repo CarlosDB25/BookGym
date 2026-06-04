@@ -2,20 +2,29 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { Logo } from '../components/shared/Logo'
-import { IconLogIn, IconUser, IconLock, IconAlertTriangle, IconCheck } from '../components/shared/Icons'
+import { IconLogIn, IconUser, IconLock, IconAlertTriangle, IconCheck, IconSun, IconMoon } from '../components/shared/Icons'
+import { useDarkMode } from '../hooks/useDarkMode'
+
+const RAND_ID_NAME = `bk_${Math.random().toString(36).slice(2, 10)}`
+const RAND_PW_NAME = `bp_${Math.random().toString(36).slice(2, 10)}`
 
 export function Login({ onLogin }) {
-  const [idInstitucional, setIdInstitucional] = useState('EST001')
-  const [password, setPassword] = useState('password123')
+  const [idInstitucional, setIdInstitucional] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [aceptoTerminos, setAceptoTerminos] = useState(
     () => localStorage.getItem('terminosAceptados') === 'true'
   )
+  const { isDark, toggle: toggleDark } = useDarkMode()
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (!aceptoTerminos) return
+    if (!idInstitucional.trim() || !password) {
+      setError('Ingresa tu ID institucional y contraseña')
+      return
+    }
     setError('')
     setLoading(true)
     try {
@@ -29,7 +38,16 @@ export function Login({ onLogin }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface p-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-surface p-4">
+      <button
+        type="button"
+        onClick={toggleDark}
+        aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+        className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"
+      >
+        {isDark ? <IconSun className="h-4 w-4" /> : <IconMoon className="h-4 w-4" />}
+      </button>
+
       <motion.section
         className="w-full max-w-md"
         initial={{ opacity: 0, y: 20 }}
@@ -52,7 +70,7 @@ export function Login({ onLogin }) {
             <span className="text-sm font-medium text-primary-800">Acceso institucional</span>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off" data-form-type="other">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-slate-700">
                 ID institucional
@@ -64,6 +82,14 @@ export function Login({ onLogin }) {
                   value={idInstitucional}
                   onChange={(e) => setIdInstitucional(e.target.value)}
                   placeholder="Ej: EST001"
+                  type="text"
+                  name={RAND_ID_NAME}
+                  id={RAND_ID_NAME}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
+                  inputMode="text"
                 />
               </div>
             </div>
@@ -80,6 +106,12 @@ export function Login({ onLogin }) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
+                  name={RAND_PW_NAME}
+                  id={RAND_PW_NAME}
+                  autoComplete="new-password"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck="false"
                 />
               </div>
             </div>
@@ -122,12 +154,11 @@ export function Login({ onLogin }) {
               {loading ? 'Ingresando...' : 'Ingresar'}
             </button>
           </form>
-
-          <div className="mt-6 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-            <p>Demo: <strong>EST001</strong> / password123</p>
-            <p>Admin: <strong>ADM001</strong> / password123</p>
-          </div>
         </div>
+
+        <p className="mt-6 text-center text-xs text-slate-400">
+          ¿Problemas para entrar? Contacta al administrador del gimnasio.
+        </p>
       </motion.section>
     </div>
   )

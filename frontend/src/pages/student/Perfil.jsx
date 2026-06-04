@@ -2,11 +2,13 @@ import { useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../hooks/useAuth'
 import { useHistorialReservas, useReservas } from '../../hooks/useReservas'
+import { useDarkMode } from '../../hooks/useDarkMode'
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader'
-import { IconShieldCheck, IconAlertTriangle, IconBan, IconCheck, IconClose, IconCalendar, IconClock, IconAward, IconLogOut } from '../../components/shared/Icons'
+import { IconShieldCheck, IconAlertTriangle, IconBan, IconCheck, IconClose, IconCalendar, IconClock, IconAward, IconLogOut, IconSun, IconMoon } from '../../components/shared/Icons'
 
 export function Perfil({ usuario }) {
   const { logout } = useAuth()
+  const { theme, setLight, setDark } = useDarkMode()
   const queryClient = useQueryClient()
   const { data: historial = [], isLoading } = useHistorialReservas()
   const { data: reservas = [] } = useReservas()
@@ -170,6 +172,44 @@ export function Perfil({ usuario }) {
         </div>
         <p className="mt-1 text-lg font-bold text-slate-900">America/Bogota (UTC-5)</p>
         <p className="text-xs text-slate-500">Las reservas y horarios usan esta zona horaria.</p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="mb-3 flex items-center gap-2 text-slate-500">
+          {theme === 'dark' ? <IconMoon className="h-4 w-4" /> : <IconSun className="h-4 w-4" />}
+          <span className="text-xs">Apariencia</span>
+        </div>
+        <p className="mb-3 text-sm text-slate-700">
+          Cambia entre modo claro y oscuro. Tu preferencia queda guardada en este dispositivo.
+        </p>
+        <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1">
+          <button
+            type="button"
+            onClick={setLight}
+            aria-pressed={theme === 'light'}
+            className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+              theme === 'light'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <IconSun className="h-4 w-4" />
+            Claro
+          </button>
+          <button
+            type="button"
+            onClick={setDark}
+            aria-pressed={theme === 'dark'}
+            className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+              theme === 'dark'
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <IconMoon className="h-4 w-4" />
+            Oscuro
+          </button>
+        </div>
       </div>
 
       <button

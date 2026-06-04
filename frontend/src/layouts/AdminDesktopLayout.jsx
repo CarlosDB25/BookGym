@@ -1,8 +1,9 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { IconLayoutDashboard, IconScan, IconUsers, IconSettings, IconLogOut } from '../components/shared/Icons'
+import { IconLayoutDashboard, IconScan, IconUsers, IconSettings, IconLogOut, IconSun, IconMoon } from '../components/shared/Icons'
 import { Logo } from '../components/shared/Logo'
 import { formatClock } from '../utils/time'
+import { useDarkMode } from '../hooks/useDarkMode'
 
 function ClockWidget() {
   const [clock, setClock] = useState(formatClock())
@@ -10,7 +11,7 @@ function ClockWidget() {
     const interval = setInterval(() => setClock(formatClock()), 1000)
     return () => clearInterval(interval)
   }, [])
-  return <div className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-xs font-medium text-slate-600">{clock}</div>
+  return <div className="rounded-lg bg-slate-100 px-3 py-1.5 font-mono text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">{clock}</div>
 }
 
 const sidebarItems = [
@@ -22,12 +23,13 @@ const sidebarItems = [
 
 export function AdminDesktopLayout({ usuario, onLogout }) {
   const location = useLocation()
+  const { isDark, toggle } = useDarkMode()
 
   const breadcrumb = sidebarItems.find((s) => s.path === location.pathname)?.label || 'Panel'
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
-      <aside className="fixed left-0 top-0 flex h-screen w-[260px] flex-col bg-slate-950 text-white">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
+      <aside className="fixed left-0 top-0 flex h-screen w-[260px] flex-col bg-slate-950 text-white dark:bg-slate-950">
         <div className="flex h-20 items-center gap-3 px-6">
           <Logo size={36} />
           <span className="text-xl tracking-tight">
@@ -75,13 +77,21 @@ export function AdminDesktopLayout({ usuario, onLogout }) {
       </aside>
 
       <div className="ml-[260px] flex flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-[70px] items-center justify-between border-b border-slate-200 bg-white/80 px-6 backdrop-blur-md">
+        <header className="sticky top-0 z-20 flex h-[70px] items-center justify-between border-b border-slate-200 bg-white/80 px-6 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/80">
           <div className="flex items-center gap-2 text-sm">
             <span className="font-medium text-slate-400">Admin</span>
             <span className="text-slate-300">/</span>
-            <span className="font-semibold text-slate-800">{breadcrumb}</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-100">{breadcrumb}</span>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={toggle}
+              aria-label={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              {isDark ? <IconSun className="h-4 w-4" /> : <IconMoon className="h-4 w-4" />}
+            </button>
             <ClockWidget />
           </div>
         </header>

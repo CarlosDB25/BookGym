@@ -246,17 +246,19 @@ export function ExploradorFranjas({ onNotice }) {
                   pasada ? 'border-slate-100 opacity-60' : 'border-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className="flex w-20 shrink-0 flex-col items-center justify-center rounded-xl bg-slate-50 py-3">
-                    <IconClock className="mb-1 h-4 w-4 text-slate-400" />
-                    <p className="text-lg font-bold text-slate-800">{franja.horaInicio}</p>
-                    <p className="text-[10px] text-slate-500">a {franja.horaFin}</p>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
+                  <div className="flex w-full items-center gap-3 md:w-20 md:shrink-0 md:flex-col md:justify-center md:rounded-xl md:bg-slate-50 md:py-3">
+                    <IconClock className="h-4 w-4 shrink-0 text-slate-400" />
+                    <div className="flex flex-1 items-baseline gap-1.5 md:flex-col md:items-center md:gap-0">
+                      <p className="text-lg font-bold text-slate-800">{franja.horaInicio}</p>
+                      <p className="text-xs text-slate-500 md:text-[10px]">a {franja.horaFin}</p>
+                    </div>
                   </div>
 
                   <div className="flex-1 space-y-2">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 text-sm text-slate-600">
-                        <IconUsers className="h-4 w-4 text-slate-400" />
+                        <IconUsers className="h-4 w-4 shrink-0 text-slate-400" />
                         <strong className="text-slate-800">{franja.cuposDisponibles}</strong>
                         <span>/ {franja.capacidadMaxima} cupos</span>
                       </div>
@@ -273,7 +275,7 @@ export function ExploradorFranjas({ onNotice }) {
                   <button
                     onClick={() => pedirReserva(franja)}
                     disabled={deshabilitado || crearReserva.isPending}
-                    className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] ${estadoColor} ${
+                    className={`w-full rounded-xl px-4 py-3 text-sm font-semibold transition active:scale-[0.98] md:w-auto md:shrink-0 md:py-2.5 ${estadoColor} ${
                       deshabilitado || crearReserva.isPending ? 'cursor-not-allowed' : ''
                     }`}
                   >
