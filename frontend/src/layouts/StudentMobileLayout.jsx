@@ -123,7 +123,6 @@ function DesktopSidebar({ location, usuario, onLogout }) {
 export function StudentMobileLayout({ usuario, onLogout }) {
   const location = useLocation()
   const { isDark, toggle } = useDarkMode()
-  const enPerfil = location.pathname === '/perfil'
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 md:flex md:items-start">
@@ -147,14 +146,12 @@ export function StudentMobileLayout({ usuario, onLogout }) {
               >
                 {isDark ? <IconSun className="h-4 w-4" /> : <IconMoon className="h-4 w-4" />}
               </button>
-              {!enPerfil && (
-                <button
-                  onClick={onLogout}
-                  className="rounded-lg bg-danger-50 px-2.5 py-1 text-xs font-semibold text-danger-600 transition hover:bg-danger-100 dark:bg-danger-900/30"
-                >
-                  Salir
-                </button>
-              )}
+              <button
+                onClick={onLogout}
+                className="rounded-lg bg-danger-50 px-2.5 py-1 text-xs font-semibold text-danger-600 transition hover:bg-danger-100 dark:bg-danger-900/30"
+              >
+                Salir
+              </button>
             </div>
           </div>
         </header>

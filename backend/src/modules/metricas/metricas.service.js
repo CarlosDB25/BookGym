@@ -150,10 +150,15 @@ async function recomendaciones(limite = 5, usuarioId = null) {
 
   let perfilUsuario = null;
   if (usuarioId && reservasUsuario.length > 0) {
-    const total = reservasUsuario.length;
-    const completadas = reservasUsuario.filter((r) => r.estado === 'completada' || r.asistencia?.resultado === 'presente').length;
-    const noShows = reservasUsuario.filter((r) => r.estado === 'no_show' || r.asistencia?.resultado === 'no_show').length;
+    const finalizadas = reservasUsuario.filter(
+      (r) => r.estado === 'completada' || r.estado === 'no_show'
+        || r.asistencia?.resultado === 'presente' || r.asistencia?.resultado === 'no_show'
+    );
+    const completadas = finalizadas.filter((r) => r.estado === 'completada' || r.asistencia?.resultado === 'presente').length;
+    const noShows = finalizadas.filter((r) => r.estado === 'no_show' || r.asistencia?.resultado === 'no_show').length;
     const canceladas = reservasUsuario.filter((r) => r.estado === 'cancelada').length;
+    const totalFinalizadas = finalizadas.length;
+    const totalReservasNoCanceladas = reservasUsuario.filter((r) => r.estado !== 'cancelada').length;
 
     const diaFreq = {};
     const horaFreq = {};
@@ -180,24 +185,46 @@ async function recomendaciones(limite = 5, usuarioId = null) {
       }
     }
 
+    const reservasOrdenadas = [...reservasUsuario].sort(
+      (a, b) => new Date(b.fechaCreacion || 0) - new Date(a.fechaCreacion || 0)
+    );
+    let racha = 0;
+    for (const r of reservasOrdenadas) {
+      if (r.estado === 'cancelada') continue;
+      if (r.estado === 'no_show' || r.asistencia?.resultado === 'no_show') break;
+      if (r.estado === 'completada' || r.asistencia?.resultado === 'presente') racha += 1;
+    }
+
+    const pct = (count) => (totalReservasNoCanceladas > 0 ? Math.round((count / totalReservasNoCanceladas) * 100) : 0);
+
     perfilUsuario = {
-      totalReservas: total,
+      totalFinalizadas,
+      totalReservas: totalFinalizadas,
+      totalHistorico: reservasUsuario.length,
+      totalReservasNoCanceladas,
       completadas,
       noShows,
       canceladas,
-      tasaAsistencia: total > 0 ? Math.round((completadas / total) * 100) : 0,
-      tasaNoShow: total > 0 ? Math.round((noShows / total) * 100) : 0,
+      tasaAsistencia: totalFinalizadas > 0 ? Math.round((completadas / totalFinalizadas) * 100) : 0,
+      tasaNoShow: totalFinalizadas > 0 ? Math.round((noShows / totalFinalizadas) * 100) : 0,
+      rachaAsistencia: racha,
       diaFavorito: diasOrdenados[0]?.[0] || null,
-      diaFavoritoPct: diasOrdenados[0] ? Math.round((diasOrdenados[0][1] / total) * 100) : 0,
+      diaFavoritoPct: diasOrdenados[0] ? pct(diasOrdenados[0][1]) : 0,
       horaFavorita: horasOrdenadas[0]?.[0] || null,
-      horaFavoritaPct: horasOrdenadas[0] ? Math.round((horasOrdenadas[0][1] / total) * 100) : 0,
+      horaFavoritaPct: horasOrdenadas[0] ? pct(horasOrdenadas[0][1]) : 0,
       slotFavorito: slotsOrdenados[0]?.[0] || null,
       slotFavoritoVeces: slotsOrdenados[0]?.[1] || 0,
-      diasFrecuentes: diasOrdenados.slice(0, 3).map(([d, c]) => ({ dia: d, count: c, pct: Math.round((c / total) * 100) })),
-      horasFrecuentes: horasOrdenadas.slice(0, 3).map(([h, c]) => ({ hora: h, count: c, pct: Math.round((c / total) * 100) })),
+      diasFrecuentes: diasOrdenados.slice(0, 3).map(([d, c]) => ({ dia: d, count: c, pct: pct(c) })),
+      horasFrecuentes: horasOrdenadas.slice(0, 3).map(([h, c]) => ({ hora: h, count: c, pct: pct(c) })),
       slotsFrecuentes: slotsOrdenados.slice(0, 5).map(([s, c]) => ({ slot: s, count: c })),
       horasConNoShow: Object.entries(noShowPorHora).map(([h, c]) => ({ hora: h, noShows: c })),
-      historialRelevante: total,
+      distribucionDias: ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'].map((d) => ({
+        dia: d,
+        count: diaFreq[d] || 0,
+        pct: pct(diaFreq[d] || 0),
+      })),
+      distribucionHoras: horasOrdenadas.slice(0, 5).map(([h, c]) => ({ hora: h, count: c, pct: pct(c) })),
+      historialRelevante: totalFinalizadas,
     };
   }
 
