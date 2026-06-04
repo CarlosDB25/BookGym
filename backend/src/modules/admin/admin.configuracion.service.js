@@ -1,7 +1,7 @@
 const prisma = require('../../shared/prisma/client');
 const configuracionService = require('../configuracion/configuracion.service');
 
-async function actualizarReglas(datos) {
+async function actualizarReglas(datos, idAdmin) {
   const claves = Object.keys(datos);
 
   if (claves.length === 0) {
@@ -10,6 +10,8 @@ async function actualizarReglas(datos) {
       { status: 400 }
     );
   }
+
+  const cambios = [];
 
   for (const clave of claves) {
     if (!Object.prototype.hasOwnProperty.call(DEFAULT_REGLAS, clave)) {
@@ -26,6 +28,9 @@ async function actualizarReglas(datos) {
         { status: 400 }
       );
     }
+
+    const antes = await prisma.configuracion.findUnique({ where: { clave } });
+    cambios.push({ clave, valorAnterior: antes?.valor || null, valorNuevo: String(valor) });
 
     await prisma.configuracion.upsert({
       where: { clave },
@@ -48,6 +53,17 @@ async function actualizarReglas(datos) {
     )
   );
 
+  if (idAdmin && cambios.length > 0) {
+    await prisma.auditLog.create({
+      data: {
+        accion: 'actualizar_config',
+        entidad: 'configuracion',
+        detalle: JSON.stringify(cambios),
+        idUsuario: idAdmin,
+      },
+    });
+  }
+
   const filas = await prisma.configuracion.findMany({
     where: { clave: { in: Object.keys(DEFAULT_REGLAS) } },
     select: { clave: true, valor: true },
@@ -66,6 +82,13 @@ async function actualizarReglas(datos) {
     ventanaCheckinMin: valores.ventana_checkin_min,
     diasSuspensionPorNoshow: valores.dias_suspension_por_noshow,
   };
+}
+
+async function obtenerAuditLog() {
+  return prisma.auditLog.findMany({
+    orderBy: { creadoEn: 'desc' },
+    take: 100,
+  });
 }
 
 const DEFAULT_REGLAS = {

@@ -47,10 +47,18 @@ function buscarFranja(map, dia, horaInicio) {
   return map[`${dia}|${horaInicio}`];
 }
 
+async function decrementarCupo(idFranja) {
+  await prisma.franja.update({
+    where: { id: idFranja },
+    data: { cuposDisponibles: { decrement: 1 } },
+  });
+}
+
 async function crearReservaYAsistencia(idUsuario, idFranja, estado, registradoPor) {
   const reserva = await prisma.reserva.create({
     data: { idUsuario, idFranja, estado },
   });
+  await decrementarCupo(idFranja);
   if (estado === 'completada') {
     await prisma.asistencia.create({
       data: {
@@ -63,10 +71,27 @@ async function crearReservaYAsistencia(idUsuario, idFranja, estado, registradoPo
   return reserva;
 }
 
+async function crearReservaNoShow(idUsuario, idFranja) {
+  const reserva = await prisma.reserva.create({
+    data: { idUsuario, idFranja, estado: 'no_show' },
+  });
+  await decrementarCupo(idFranja);
+  return reserva;
+}
+
+async function crearReservaActiva(idUsuario, idFranja) {
+  const reserva = await prisma.reserva.create({
+    data: { idUsuario, idFranja, estado: 'activa' },
+  });
+  await decrementarCupo(idFranja);
+  return reserva;
+}
+
 async function main() {
   const usuariosExistentes = await prisma.usuario.count();
   if (usuariosExistentes > 0) {
     console.log('[Seed] Limpiando datos existentes...');
+    await prisma.auditLog.deleteMany();
     await prisma.asistencia.deleteMany();
     await prisma.reserva.deleteMany();
     await prisma.suspension.deleteMany();
@@ -195,10 +220,8 @@ async function main() {
   await crearReservaYAsistencia(EST.CUMPLIDO,   buscarFranja(F[-2], 'martes',   '08:00').id, 'completada', 'ADM001');
   await crearReservaYAsistencia(EST.CUMPLIDO,   buscarFranja(F[-2], 'viernes',  '07:00').id, 'completada', 'ADM001');
 
-  const noshow1 = await prisma.reserva.create({ data: { idUsuario: EST.INFRACTOR, idFranja: buscarFranja(F[-2], 'lunes', '07:00').id, estado: 'no_show' } });
-  await prisma.asistencia.create({ data: { idReserva: noshow1.id, registradoPor: 'ADM001', resultado: 'no_show' } });
-  const noshow2 = await prisma.reserva.create({ data: { idUsuario: EST.INFRACTOR, idFranja: buscarFranja(F[-2], 'miercoles', '10:00').id, estado: 'no_show' } });
-  await prisma.asistencia.create({ data: { idReserva: noshow2.id, registradoPor: 'ADM001', resultado: 'no_show' } });
+  await crearReservaNoShow(EST.INFRACTOR, buscarFranja(F[-2], 'lunes', '07:00').id);
+  await crearReservaNoShow(EST.INFRACTOR, buscarFranja(F[-2], 'miercoles', '10:00').id);
 
   await crearReservaYAsistencia(EST.PUNTUAL,    buscarFranja(F[-2], 'lunes',    '14:00').id, 'completada', 'ADM001');
   await crearReservaYAsistencia(EST.PUNTUAL,    buscarFranja(F[-2], 'miercoles','16:00').id, 'completada', 'ADM001');
@@ -214,8 +237,7 @@ async function main() {
   // --- Semana -1 (semana pasada) ---
   await crearReservaYAsistencia(EST.CUMPLIDO,   buscarFranja(F[-1], 'lunes',    '10:00').id, 'completada', 'ADM001');
 
-  const noshow3 = await prisma.reserva.create({ data: { idUsuario: EST.INFRACTOR, idFranja: buscarFranja(F[-1], 'viernes', '14:00').id, estado: 'no_show' } });
-  await prisma.asistencia.create({ data: { idReserva: noshow3.id, registradoPor: 'ADM001', resultado: 'no_show' } });
+  await crearReservaNoShow(EST.INFRACTOR, buscarFranja(F[-1], 'viernes', '14:00').id);
 
   await crearReservaYAsistencia(EST.PUNTUAL,    buscarFranja(F[-1], 'martes',   '10:00').id, 'completada', 'ADM001');
   await crearReservaYAsistencia(EST.PUNTUAL,    buscarFranja(F[-1], 'miercoles','14:00').id, 'completada', 'ADM001');
@@ -230,29 +252,20 @@ async function main() {
   // --- Semana -2 — historico para EST008 (test) ---
   await crearReservaYAsistencia(EST.TEST, buscarFranja(F[-2], 'martes', '10:00').id, 'completada', 'ADM001');
 
-  // --- Semana 0 (actual) — activas (si la franja aun no paso) ---
-  for (const dia of ['martes', 'jueves']) {
-    await prisma.reserva.create({
-      data: { idUsuario: EST.CUMPLIDO, idFranja: buscarFranja(F[0], dia, '08:00').id, estado: 'activa' },
-    });
-  }
-  await prisma.reserva.create({
-    data: { idUsuario: EST.NUEVO, idFranja: buscarFranja(F[0], 'miercoles', '10:00').id, estado: 'activa' },
-  });
-  await prisma.reserva.create({
-    data: { idUsuario: EST.TEST, idFranja: buscarFranja(F[0], 'jueves', '14:00').id, estado: 'activa' },
-  });
+  // --- Semana 0 (actual) — activas actuales ---
+  // Estás en ventana de check-in (en los próximos 15 min si la hora coincide) o ya pasaron
+  await crearReservaActiva(EST.CUMPLIDO,  buscarFranja(F[0], 'martes', '08:00').id);
+  await crearReservaActiva(EST.CUMPLIDO,  buscarFranja(F[0], 'jueves', '08:00').id);
+  await crearReservaActiva(EST.NUEVO,     buscarFranja(F[0], 'miercoles', '10:00').id);
+  await crearReservaActiva(EST.TEST,      buscarFranja(F[0], 'jueves', '14:00').id);
+
+  // Activas vencidas (sin check-in y fuera de ventana) — el scheduler las marcará como no_show
+  await crearReservaActiva(EST.INFRACTOR, buscarFranja(F[0], 'lunes', '07:00').id);
 
   // --- Semana +1 (proxima) — activas futuras ---
-  await prisma.reserva.create({
-    data: { idUsuario: EST.CUMPLIDO,  idFranja: buscarFranja(F[1], 'lunes', '09:00').id, estado: 'activa' },
-  });
-  await prisma.reserva.create({
-    data: { idUsuario: EST.FRECUENTE, idFranja: buscarFranja(F[1], 'miercoles', '11:00').id, estado: 'activa' },
-  });
-  await prisma.reserva.create({
-    data: { idUsuario: EST.NUEVO,     idFranja: buscarFranja(F[1], 'viernes', '08:00').id, estado: 'activa' },
-  });
+  await crearReservaActiva(EST.CUMPLIDO,  buscarFranja(F[1], 'lunes', '09:00').id);
+  await crearReservaActiva(EST.FRECUENTE, buscarFranja(F[1], 'miercoles', '11:00').id);
+  await crearReservaActiva(EST.NUEVO,     buscarFranja(F[1], 'viernes', '08:00').id);
 
   console.log('[Seed] Reservas historicas + activas creadas ✓');
 

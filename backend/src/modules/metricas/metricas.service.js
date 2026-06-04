@@ -230,11 +230,12 @@ async function resumen(fecha) {
   function calcularMetricas(listaFranjas) {
     const capacidad = listaFranjas.reduce((acc, f) => acc + f.plantilla.capacidadMaxima, 0);
     const disponibles = listaFranjas.reduce((acc, f) => acc + f.cuposDisponibles, 0);
-    let reservadas = 0, noShows = 0;
+    let reservadas = 0, canceladas = 0, noShows = 0;
     for (const f of listaFranjas) {
       for (const r of f.reservas) {
         if (r.estado === 'activa') reservadas++;
         else if (r.estado === 'no_show') noShows++;
+        else if (r.estado === 'cancelada') canceladas++;
       }
     }
     const alta = listaFranjas.filter(f => calcOcupacion(f.cuposDisponibles, f.plantilla.capacidadMaxima) >= 75).length;
@@ -245,7 +246,7 @@ async function resumen(fecha) {
     const horas = listaFranjas.map(f => ({ dia: f.plantilla.diaSemana, horaInicio: f.plantilla.horaInicio, saturacion: calcOcupacion(f.cuposDisponibles, f.plantilla.capacidadMaxima) }));
     const pico = horas.filter(h => h.saturacion >= 75).sort((a, b) => b.saturacion - a.saturacion).slice(0, 3);
     const valle = horas.filter(h => h.saturacion < 25).sort((a, b) => a.saturacion - b.saturacion).slice(0, 3);
-    return { capacidad, disponibles, reservadas, noShows, ocupacion, tasaNoShow, alta, media, baja, total: listaFranjas.length, pico, valle };
+    return { capacidad, disponibles, reservadas, canceladas, noShows, ocupacion, tasaNoShow, alta, media, baja, total: listaFranjas.length, pico, valle };
   }
 
   const vigentes = filtrarVigentes(franjas);
@@ -257,13 +258,19 @@ async function resumen(fecha) {
   const diffOcupacion = actual.ocupacion - anterior.ocupacion;
   const tendenciaOcupacion = diffOcupacion > 5 ? 'subiendo' : diffOcupacion < -5 ? 'bajando' : 'estable';
   const cambioOcupacion = anterior.ocupacion > 0 ? `${diffOcupacion > 0 ? '+' : ''}${diffOcupacion}%` : 'sin dato previo';
+  const diffNoShow = actual.tasaNoShow - anterior.tasaNoShow;
+
+  const suspendidos = await prisma.suspension.count({ where: { activa: true, fechaFin: { gte: new Date() } } });
 
   return {
     semana: inicio.toISOString().slice(0, 10), totalCapacidad: actual.capacidad,
     totalDisponibles: actual.disponibles, totalReservadas: actual.reservadas,
+    totalCanceladas: actual.canceladas, totalNoShow: actual.noShows,
     ocupacionPromedio: actual.ocupacion, tendenciaOcupacion, cambioVsSemanaAnterior: cambioOcupacion,
+    cambioOcupacion: diffOcupacion, cambioNoShow: diffNoShow,
     saturacionAlta: actual.alta, saturacionMedia: actual.media, saturacionBaja: actual.baja,
-    totalFranjas: actual.total, tasaNoShow: actual.tasaNoShow, horasPico: actual.pico, horasValle: actual.valle,
+    totalFranjas: actual.total, tasaNoShow: actual.tasaNoShow, suspendidos,
+    horasPico: actual.pico, horasValle: actual.valle,
   };
 }
 

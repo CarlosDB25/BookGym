@@ -103,9 +103,10 @@ export function AdminUsuarios({ onNotice }) {
   }
 
   async function confirmarLevantar() {
-    if (!selectedUser?.id || !justificacion.trim()) return
+    const suspensionId = selectedUser?.suspension?.id
+    if (!suspensionId || !justificacion.trim()) return
     try {
-      await levantar.mutateAsync({ id: selectedUser.id, justificacion })
+      await levantar.mutateAsync({ id: suspensionId, justificacion })
       onNotice?.('success', 'Suspensión levantada exitosamente')
       setModal({ open: false })
       setDrawerOpen(false)

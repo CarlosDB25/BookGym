@@ -91,6 +91,18 @@ model Configuracion {
   @@map("configuracion")
 }
 
+model AuditLog {
+  id         String   @id @default(uuid())
+  accion     String
+  entidad    String
+  idEntidad  String?
+  detalle    String?
+  idUsuario  String
+  creadoEn   DateTime @default(now())
+
+  @@map("audit_log")
+}
+
 enum Rol {
   estudiante
   administrador

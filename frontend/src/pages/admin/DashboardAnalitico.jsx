@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import {
   PieChart, Pie, Cell,
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -15,7 +15,18 @@ const DONUT_COLORS = {
   no_show: '#f43f5e',
 }
 
-const HEAT_COLORS = ['#eff6ff', '#dbeafe', '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6', '#2563eb', '#1d4ed8']
+function ocupacionColor(pct) {
+  if (pct >= 80) return '#f43f5e'
+  if (pct >= 60) return '#f59e0b'
+  if (pct >= 40) return '#3b82f6'
+  return '#10b981'
+}
+
+const TIPO_OPCIONES = [
+  { id: 'semana', label: 'Semanal' },
+  { id: 'dia', label: 'Diario' },
+  { id: 'mes', label: 'Mensual' },
+]
 
 function KpiCard({ icon: Icon, label, value, trend, trendLabel }) {
   return (
@@ -41,8 +52,9 @@ function KpiCard({ icon: Icon, label, value, trend, trendLabel }) {
 
 export function DashboardAnalitico({ onNotice }) {
   const fecha = useMemo(() => mondayFromYMD(todayYMD()), [])
+  const [tipoAnalisis, setTipoAnalisis] = useState('semana')
   const { data: resumen, isLoading } = useMetricasResumen(fecha)
-  const { data: analisis } = useMetricasAnalisis('semana', fecha)
+  const { data: analisis } = useMetricasAnalisis(tipoAnalisis, fecha)
 
   if (isLoading) {
     return (
@@ -75,7 +87,7 @@ export function DashboardAnalitico({ onNotice }) {
         <KpiCard
           icon={IconActivity}
           label="Ocupación"
-          value={`${ocupacion}%`}
+          value={`${Number(ocupacion).toFixed(1)}%`}
           trend={tendencia}
         />
       </div>
@@ -83,7 +95,7 @@ export function DashboardAnalitico({ onNotice }) {
         <KpiCard
           icon={IconX}
           label="Tasa No-Show"
-          value={`${tasaNoShow}%`}
+          value={`${Number(tasaNoShow).toFixed(1)}%`}
           trend={resumen?.cambioNoShow}
           trendLabel="vs semana ant."
         />
@@ -104,28 +116,46 @@ export function DashboardAnalitico({ onNotice }) {
       </div>
 
       <div className="col-span-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
-        <h3 className="mb-4 text-sm font-semibold text-slate-800">Saturación Semanal</h3>
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-800">Saturación</h3>
+          <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+            {TIPO_OPCIONES.map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => setTipoAnalisis(id)}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                  tipoAnalisis === id
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         {analisisData.length > 0 ? (
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={analisisData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="periodo" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-              <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
+              <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" domain={[0, 100]} />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                formatter={(val) => [`${Number(val).toFixed(1)}%`, 'Ocupación']}
               />
               <Bar dataKey="ocupacion" name="Ocupación %" radius={[8, 8, 0, 0]}>
                 {analisisData.map((entry, idx) => (
                   <Cell
                     key={idx}
-                    fill={HEAT_COLORS[Math.min(Math.floor((entry.ocupacion || 0) / 12.5), 7)]}
+                    fill={ocupacionColor(entry.ocupacion || 0)}
                   />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <p className="text-sm text-slate-400">Sin datos de análisis semanal</p>
+          <p className="text-sm text-slate-400">Sin datos de análisis {tipoAnalisis === 'dia' ? 'diario' : tipoAnalisis === 'mes' ? 'mensual' : 'semanal'}</p>
         )}
       </div>
 
@@ -148,7 +178,7 @@ export function DashboardAnalitico({ onNotice }) {
                     <Cell key={entry.key} fill={DONUT_COLORS[entry.key]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <Tooltip formatter={(val) => [val, 'Reservas']} />
               </PieChart>
             </ResponsiveContainer>
             <div className="mt-2 flex flex-wrap gap-4 text-xs">
@@ -181,9 +211,10 @@ export function DashboardAnalitico({ onNotice }) {
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="periodo" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-              <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
+              <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" domain={[0, 100]} />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0' }}
+                formatter={(val) => [`${Number(val).toFixed(1)}%`, 'Ocupación']}
               />
               <Area
                 type="monotone"

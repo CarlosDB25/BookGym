@@ -108,7 +108,9 @@ async function levantarSuspension(id, idAdmin) {
       },
       reservas: {
         where: { estado: { in: ['activa', 'no_show', 'completada'] } },
-        select: { estado: true, asistencia: { select: { resultado: true } } },
+        select: { estado: true, asistencia: { select: { resultado: true } }, franja: { select: { fecha: true, plantilla: { select: { horaInicio: true, horaFin: true, diaSemana: true } } } } },
+        orderBy: { fechaCreacion: 'desc' },
+        take: 10,
       },
     },
     orderBy: { idInstitucional: 'asc' },
@@ -119,6 +121,12 @@ async function levantarSuspension(id, idAdmin) {
     const noShows = u.reservas.filter((r) => r.estado === 'no_show' || (r.estado === 'activa' && !r.asistencia)).length;
     const suspensionActiva = u.suspensiones.length > 0 ? u.suspensiones[0] : null;
 
+    const reservasRecientes = u.reservas.map((r) => ({
+      estado: r.estado,
+      franja: `${r.franja.plantilla.diaSemana} ${r.franja.plantilla.horaInicio}-${r.franja.plantilla.horaFin}`,
+      fecha: r.franja.fecha,
+    }));
+
     return {
       usuarioId: u.idInstitucional,
       usuarioNombre: u.idInstitucional,
@@ -128,6 +136,7 @@ async function levantarSuspension(id, idAdmin) {
       suspension: suspensionActiva
         ? { id: suspensionActiva.id, fechaInicio: suspensionActiva.fechaInicio, fechaFin: suspensionActiva.fechaFin, motivo: suspensionActiva.motivo }
         : null,
+      reservasRecientes,
     };
   });
 }

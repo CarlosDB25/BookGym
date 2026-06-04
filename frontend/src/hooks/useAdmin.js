@@ -53,3 +53,38 @@ export function useActualizarReglas() {
     },
   })
 }
+
+export function useAuditLog() {
+  return useQuery({
+    queryKey: ['admin-audit-log'],
+    queryFn: async () => {
+      const { data } = await api.get('/admin/configuracion/audit-log')
+      return data
+    },
+    refetchInterval: 30000,
+  })
+}
+
+export function usePlantillas() {
+  return useQuery({
+    queryKey: ['admin-plantillas'],
+    queryFn: async () => {
+      const { data } = await api.get('/admin/plantillas')
+      return data
+    },
+  })
+}
+
+export function useActualizarPlantilla() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }) => {
+      const { data } = await api.put(`/admin/plantillas/${id}`, payload)
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-plantillas'] })
+      queryClient.invalidateQueries({ queryKey: ['franjas-semana'] })
+    },
+  })
+}

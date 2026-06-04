@@ -122,10 +122,17 @@ export function ScannerHub({ onNotice }) {
       mounted = false
       const curr = instance || scannerRef.current
       scannerRef.current = null
-      if (containerEl) {
-        try { containerEl.innerHTML = '' } catch { /* ignore */ }
+      if (curr) {
+        curr.stop()
+          .catch(() => {})
+          .finally(() => {
+            if (containerEl) {
+              try { containerEl.innerHTML = '' } catch {}
+            }
+          })
+      } else if (containerEl) {
+        try { containerEl.innerHTML = '' } catch {}
       }
-      if (curr) curr.stop().catch(() => {})
     }
   }, [])
 

@@ -9,10 +9,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import {
   todayYMD,
   mondayFromYMD,
-  nowMillis,
-  parseSlotMillis,
   formatDayHeader,
-  formatDate,
 } from '../../utils/time'
 import { IconCalendar, IconX } from '../../components/shared/Icons'
 
@@ -38,8 +35,6 @@ export function ExploradorFranjas({ onNotice }) {
   }, [lunes])
 
   const idsReservados = new Set(reservas.map((r) => r.idFranja))
-  const now = nowMillis()
-  const anticipacion = (reglas?.anticipacionReservaMin || 0) * 60 * 1000
   const maxActivas = reglas?.limiteReservasActivas || 3
   const maxDia = reglas?.maxReservasPorDia || 1
   const reservasHoy = reservas.filter((r) => {
@@ -53,12 +48,8 @@ export function ExploradorFranjas({ onNotice }) {
         const ymd = String(f.fecha || '').split('T')[0]
         return ymd === selectedDay
       })
-      .filter((f) => {
-        const inicio = parseSlotMillis(f.fecha, f.horaInicio)
-        return now < inicio - anticipacion
-      })
       .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
-  }, [franjas, selectedDay, now, anticipacion])
+  }, [franjas, selectedDay])
 
   function pedirReserva(franja) {
     setPendiente(franja)

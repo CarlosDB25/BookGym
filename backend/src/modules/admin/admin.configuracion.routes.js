@@ -104,5 +104,6 @@ router.use(verificarToken, soloAdmin);
  *         description: Error interno del servidor
  */
 router.put('/reglas-reserva', controller.actualizarReglas);
+router.get('/audit-log', controller.obtenerAuditLog);
 
 module.exports = router;

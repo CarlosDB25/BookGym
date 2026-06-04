@@ -145,13 +145,19 @@ async function registrarCheckin(idReserva, registradoPor) {
     throw error;
   }
 
-  await prisma.asistencia.create({
-    data: {
-      idReserva: reserva.id,
-      registradoPor,
-      resultado: 'presente',
-    },
-  });
+  await prisma.$transaction([
+    prisma.asistencia.create({
+      data: {
+        idReserva: reserva.id,
+        registradoPor,
+        resultado: 'presente',
+      },
+    }),
+    prisma.reserva.update({
+      where: { id: idReserva },
+      data: { estado: 'completada' },
+    }),
+  ]);
 
   return { mensaje: 'Check-in registrado exitosamente' };
 }

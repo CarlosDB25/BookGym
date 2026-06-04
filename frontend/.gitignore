@@ -30,3 +30,6 @@ dist-ssr
 *.sw?
 
 Front base
+
+# Test scripts
+scripts/

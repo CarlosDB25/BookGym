@@ -11,7 +11,7 @@ async function actualizarReglas(req, res) {
       });
     }
 
-    const reglas = await service.actualizarReglas(datos);
+    const reglas = await service.actualizarReglas(datos, req.usuario?.id);
     return res.json(reglas);
   } catch (error) {
     const status = error.status || 500;
@@ -22,4 +22,13 @@ async function actualizarReglas(req, res) {
   }
 }
 
-module.exports = { actualizarReglas };
+async function obtenerAuditLog(req, res) {
+  try {
+    const logs = await service.obtenerAuditLog();
+    return res.json(logs);
+  } catch (error) {
+    return res.status(500).json({ error: 'No fue posible obtener el historial' });
+  }
+}
+
+module.exports = { actualizarReglas, obtenerAuditLog };
