@@ -2,29 +2,28 @@ const cron = require('node-cron');
 const prisma = require('../shared/prisma/client');
 const { procesarNoShows } = require('./noshow.processor');
 
-function getWeekRange() {
-  const now = new Date();
-  const start = new Date(now);
-  const day = start.getDay();
-  const adjust = day === 0 ? -6 : 1 - day;
-  start.setDate(start.getDate() + adjust);
-  start.setHours(0, 0, 0, 0);
+const DIA_SEMANA_FROM_JS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
 
-  const end = new Date(start);
-  end.setDate(start.getDate() + 5);
+function getNextNWeekdays(n = 5) {
+  const dates = [];
+  let current = new Date();
+  current.setHours(0, 0, 0, 0);
 
-  return { start, end };
+  while (dates.length < n) {
+    const day = current.getDay();
+    if (day >= 1 && day <= 5) {
+      dates.push(new Date(current));
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return dates;
 }
 
 function semesterFromDate(date) {
   const y = date.getFullYear();
   const term = date.getMonth() < 6 ? 1 : 2;
   return `${y}-${term}`;
-}
-
-function dayOffset(diaSemana) {
-  const map = { lunes: 0, martes: 1, miercoles: 2, jueves: 3, viernes: 4 };
-  return map[diaSemana] ?? 0;
 }
 
 function ymd(date) {
@@ -34,27 +33,44 @@ function ymd(date) {
   return `${y}-${m}-${d}`;
 }
 
-async function sincronizarFranjasSemanaActual() {
-  const { start, end } = getWeekRange();
+async function sincronizarFranjasVisibles() {
+  const fechasVisibles = getNextNWeekdays(5);
+  const fechasAdelantadas = getNextNWeekdays(10);
+  const todasFechas = [...new Set([
+    ...fechasVisibles.map(ymd),
+    ...fechasAdelantadas.map(ymd),
+  ])].map((s) => {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+  });
+
+  const minFecha = todasFechas[0];
+  const maxFecha = todasFechas[todasFechas.length - 1];
 
   const plantillas = await prisma.plantillaFranja.findMany({ where: { activa: true } });
-  const actuales = await prisma.franja.findMany({ where: { fecha: { gte: start, lt: end } } });
+
+  const actuales = await prisma.franja.findMany({
+    where: {
+      fecha: { gte: minFecha, lte: maxFecha },
+    },
+  });
 
   const existentes = new Set(actuales.map((f) => `${f.idPlantilla}|${ymd(f.fecha)}`));
 
   const crear = [];
-  for (const p of plantillas) {
-    const fecha = new Date(start);
-    fecha.setDate(start.getDate() + dayOffset(p.diaSemana));
-
-    const key = `${p.id}|${ymd(fecha)}`;
-    if (!existentes.has(key)) {
-      crear.push({
-        idPlantilla: p.id,
-        fecha,
-        semestre: semesterFromDate(fecha),
-        cuposDisponibles: p.capacidadMaxima,
-      });
+  for (const fecha of todasFechas) {
+    const diaSemana = DIA_SEMANA_FROM_JS[fecha.getUTCDay()];
+    for (const p of plantillas) {
+      if (p.diaSemana !== diaSemana) continue;
+      const key = `${p.id}|${ymd(fecha)}`;
+      if (!existentes.has(key)) {
+        crear.push({
+          idPlantilla: p.id,
+          fecha,
+          semestre: semesterFromDate(fecha),
+          cuposDisponibles: p.capacidadMaxima,
+        });
+      }
     }
   }
 
@@ -62,10 +78,13 @@ async function sincronizarFranjasSemanaActual() {
     await prisma.franja.createMany({ data: crear });
   }
 
+  const haceUnaSemana = new Date(minFecha);
+  haceUnaSemana.setUTCDate(haceUnaSemana.getUTCDate() - 7);
+
   await prisma.franja.deleteMany({
     where: {
       AND: [
-        { OR: [{ fecha: { lt: start } }, { fecha: { gte: end } }] },
+        { fecha: { lt: haceUnaSemana } },
         { reservas: { none: {} } },
       ],
     },
@@ -84,12 +103,12 @@ async function ejecutarNoShow() {
 }
 
 function iniciarNoShowScheduler() {
-  sincronizarFranjasSemanaActual().catch((error) =>
+  sincronizarFranjasVisibles().catch((error) =>
     console.error('Error sincronizando franjas iniciales:', error)
   );
 
   cron.schedule('5 0 * * *', () => {
-    sincronizarFranjasSemanaActual().catch((error) =>
+    sincronizarFranjasVisibles().catch((error) =>
       console.error('Error en sincronizacion diaria de franjas:', error)
     );
   });
@@ -103,4 +122,4 @@ function iniciarNoShowScheduler() {
   console.log('[NoShow scheduler] iniciado: cron "*/15 * * * *" (cada 15 minutos)');
 }
 
-module.exports = { iniciarNoShowScheduler, sincronizarFranjasSemanaActual, procesarNoShows };
+module.exports = { iniciarNoShowScheduler, sincronizarFranjasVisibles, procesarNoShows };

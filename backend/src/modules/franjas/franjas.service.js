@@ -40,14 +40,11 @@ async function obtenerDisponibilidadSemana(fechaInicio) {
     'Minutos minimos de anticipacion para crear reserva'
   );
 
-  const inicio = new Date(fechaInicio);
-  if (isNaN(inicio.getTime())) {
-    throw new Error('Fecha invalida');
-  }
-  inicio.setHours(0, 0, 0, 0);
+  const [y, m, d] = fechaInicio.split('-').map(Number);
+  const inicio = new Date(Date.UTC(y, m - 1, d));
 
   const fechaFin = new Date(inicio);
-  fechaFin.setDate(inicio.getDate() + 5);
+  fechaFin.setUTCDate(fechaFin.getUTCDate() + 7);
 
   const franjas = await prisma.franja.findMany({
     where: {

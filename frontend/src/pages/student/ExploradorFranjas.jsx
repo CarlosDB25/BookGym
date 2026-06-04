@@ -8,68 +8,53 @@ import { CardSkeleton } from '../../components/ui/SkeletonLoader'
 import { EmptyState } from '../../components/ui/EmptyState'
 import {
   todayYMD,
-  mondayFromYMD,
   formatDayHeader,
-  now,
   nowMillis,
   parseSlotMillis,
-  isWithinWindow,
 } from '../../utils/time'
-import { IconCalendar, IconChevronLeft, IconChevronRight, IconCheckCircle, IconXCircle, IconUsers, IconClock } from '../../components/shared/Icons'
+import { IconCalendar, IconChevronLeft, IconChevronRight, IconUsers, IconClock } from '../../components/shared/Icons'
 
-function getNextMonday(date) {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = day === 0 ? 1 : 8 - day
-  d.setDate(d.getDate() + diff)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function getPrevMonday(date) {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  d.setDate(d.getDate() + (diff - 7))
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function ymd(date) {
+function ymdUTC(date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
 }
 
-export function ExploradorFranjas({ onNotice }) {
-  const today = now()
-  const initialMonday = useMemo(() => mondayFromYMD(todayYMD()), [])
+function getNext5Weekdays(fromYmd) {
+  const [y, m, d] = fromYmd.split('-').map(Number)
+  const dates = []
+  const current = new Date(y, m - 1, d)
+  current.setHours(0, 0, 0, 0)
 
-  const [semanaInicio, setSemanaInicio] = useState(initialMonday)
-  const [modal, setModal] = useState({ open: false })
-  const [pendiente, setPendiente] = useState(null)
-
-  const weekDays = useMemo(() => {
-    const monday = new Date(`${semanaInicio}T00:00:00`)
-    const days = []
-    for (let i = 0; i < 5; i++) {
-      const date = new Date(monday)
-      date.setDate(monday.getDate() + i)
-      days.push(ymd(date))
+  while (dates.length < 5) {
+    const day = current.getDay()
+    if (day >= 1 && day <= 5) {
+      dates.push(ymdUTC(current))
     }
-    return days
-  }, [semanaInicio])
+    current.setDate(current.getDate() + 1)
+  }
+
+  return dates
+}
+
+export function ExploradorFranjas({ onNotice }) {
+  const initialStart = todayYMD()
+  const [startDate, setStartDate] = useState(initialStart)
+
+  const weekDays = useMemo(() => getNext5Weekdays(startDate), [startDate])
 
   const defaultDay = useMemo(() => {
-    const todayD = todayYMD()
-    if (weekDays.includes(todayD)) return todayD
+    const today = todayYMD()
+    if (weekDays.includes(today)) return today
     return weekDays[0]
   }, [weekDays])
 
   const [selectedDay, setSelectedDay] = useState(defaultDay)
+  const [modal, setModal] = useState({ open: false })
+  const [pendiente, setPendiente] = useState(null)
 
-  const { data: franjas = [], isLoading } = useFranjas(semanaInicio)
+  const { data: franjas = [], isLoading } = useFranjas(weekDays[0])
   const { data: reservas = [] } = useReservas()
   const { data: reglas } = useReglasReserva()
   const crearReserva = useCrearReserva()
@@ -129,13 +114,16 @@ export function ExploradorFranjas({ onNotice }) {
     }
   }
 
-  function cambiarSemana(direccion) {
-    const mondayDate = new Date(`${semanaInicio}T00:00:00`)
-    if (direccion === 'next') mondayDate.setDate(mondayDate.getDate() + 7)
-    else mondayDate.setDate(mondayDate.getDate() - 7)
-    setSemanaInicio(ymd(mondayDate))
-    setSelectedDay(ymd(new Date(`${semanaInicio}T00:00:00`)))
+  function cambiarPeriodo(direccion) {
+    const [y, m, d] = weekDays[0].split('-').map(Number)
+    const base = new Date(y, m - 1, d)
+    base.setDate(base.getDate() + (direccion === 'next' ? 7 : -7))
+    const nuevo = ymdUTC(base)
+    setStartDate(nuevo)
+    setSelectedDay(nuevo)
   }
+
+  const esPeriodoActual = weekDays.includes(todayYMD())
 
   return (
     <div className="space-y-5 pt-2 md:pt-0">
@@ -155,53 +143,60 @@ export function ExploradorFranjas({ onNotice }) {
           <h1 className="text-2xl font-bold text-slate-900">Reservar</h1>
           <p className="text-sm text-slate-500">Elige un día para ver disponibilidad</p>
         </div>
+        {esPeriodoActual && (
+          <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+            Esta semana
+          </span>
+        )}
       </div>
 
-      <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-2">
-        <button
-          onClick={() => cambiarSemana('prev')}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100"
-          aria-label="Semana anterior"
-        >
-          <IconChevronLeft className="h-5 w-5" />
-        </button>
-        <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
-          {weekDays.map((day) => {
-            const isSelected = day === selectedDay
-            const isToday = day === todayYMD()
-            const dayDate = new Date(`${day}T00:00:00`)
-            return (
-              <button
-                key={day}
-                onClick={() => setSelectedDay(day)}
-                className={`flex min-w-[64px] shrink-0 flex-col items-center rounded-xl px-3 py-2 transition ${
-                  isSelected
-                    ? 'bg-primary text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <span className={`text-[10px] font-semibold uppercase ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>
-                  {formatDayHeader(day).split(' ')[0]}
-                </span>
-                <span className="text-lg font-bold leading-tight">
-                  {dayDate.getDate()}
-                </span>
-                {isToday && (
-                  <span className={`text-[10px] font-medium ${isSelected ? 'text-white/80' : 'text-primary'}`}>
-                    Hoy
+      <div className="rounded-2xl border border-slate-200 bg-white p-2">
+        <div className="flex items-center justify-between gap-1">
+          <button
+            onClick={() => cambiarPeriodo('prev')}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100"
+            aria-label="Período anterior"
+          >
+            <IconChevronLeft className="h-5 w-5" />
+          </button>
+          <div className="flex flex-1 items-center justify-center gap-1.5">
+            {weekDays.map((day) => {
+              const isSelected = day === selectedDay
+              const isToday = day === todayYMD()
+              const dayDate = new Date(`${day}T00:00:00`)
+              return (
+                <button
+                  key={day}
+                  onClick={() => setSelectedDay(day)}
+                  className={`flex min-w-0 flex-1 flex-col items-center rounded-xl px-1 py-2 transition ${
+                    isSelected
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className={`text-[10px] font-semibold uppercase ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>
+                    {formatDayHeader(day).split(' ')[0]}
                   </span>
-                )}
-              </button>
-            )
-          })}
+                  <span className="text-lg font-bold leading-tight">
+                    {dayDate.getDate()}
+                  </span>
+                  {isToday && (
+                    <span className={`text-[9px] font-medium ${isSelected ? 'text-white/80' : 'text-primary'}`}>
+                      Hoy
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          <button
+            onClick={() => cambiarPeriodo('next')}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100"
+            aria-label="Período siguiente"
+          >
+            <IconChevronRight className="h-5 w-5" />
+          </button>
         </div>
-        <button
-          onClick={() => cambiarSemana('next')}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100"
-          aria-label="Semana siguiente"
-        >
-          <IconChevronRight className="h-5 w-5" />
-        </button>
       </div>
 
       {isLoading ? (
@@ -251,7 +246,7 @@ export function ExploradorFranjas({ onNotice }) {
                   pasada ? 'border-slate-100 opacity-60' : 'border-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                   <div className="flex w-20 shrink-0 flex-col items-center justify-center rounded-xl bg-slate-50 py-3">
                     <IconClock className="mb-1 h-4 w-4 text-slate-400" />
                     <p className="text-lg font-bold text-slate-800">{franja.horaInicio}</p>
