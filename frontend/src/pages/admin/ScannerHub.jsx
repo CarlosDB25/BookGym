@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Html5Qrcode } from 'html5-qrcode'
+import { Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import api from '../../config/axios'
 import { ActionModal } from '../../components/ui/ActionModal'
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader'
-import { IconScan, IconUser, IconUserX, IconAlertTriangle, IconShieldAlert, IconCheckCircle, IconXCircle, IconCamera, IconKeyboard } from '../../components/shared/Icons'
+import { IconScan, IconUser, IconUserX, IconAlertTriangle, IconShieldAlert, IconCheckCircle, IconXCircle, IconCamera, IconKeyboard, IconBarcodeScanner, IconCameraOff } from '../../components/shared/Icons'
 
 const SCENARIO = {
   IDLE: 'idle',
@@ -13,18 +14,36 @@ const SCENARIO = {
   NO_RESERVATION: 'no_reservation',
 }
 
+const SCAN_FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.CODE_93,
+  Html5QrcodeSupportedFormats.CODABAR,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
+  Html5QrcodeSupportedFormats.PDF_417,
+  Html5QrcodeSupportedFormats.AZTEC,
+]
+
 export function ScannerHub({ onNotice }) {
-  const scannerRef = useRef(null)
   const scannerContainerRef = useRef(null)
   const inputRef = useRef(null)
-  const [scanner, setScanner] = useState(null)
   const [scanning, setScanning] = useState(false)
+  const [cameraError, setCameraError] = useState('')
   const [cedula, setCedula] = useState('')
   const [loading, setLoading] = useState(false)
   const [studentData, setStudentData] = useState(null)
   const [scenario, setScenario] = useState(SCENARIO.IDLE)
   const [modalOpen, setModalOpen] = useState(false)
   const [flashGreen, setFlashGreen] = useState(false)
+  const [scanMode, setScanMode] = useState('camera')
+  const [lastScan, setLastScan] = useState(null)
 
   const studentName = studentData?.usuario?.id || cedula
 
@@ -59,7 +78,7 @@ export function ScannerHub({ onNotice }) {
     if (!studentData?.reserva?.id) return
     try {
       await api.post(`/admin/scanner/checkin/${studentData.reserva.id}`)
-      onNotice?.('success', `Check-in registrado para ${studentName}`)
+      onNotice?.('success', `Asistencia registrada para ${studentName}`)
       setScenario(SCENARIO.IDLE)
       setStudentData(null)
       setCedula('')
@@ -68,19 +87,10 @@ export function ScannerHub({ onNotice }) {
     }
   }
 
-  function handleInputChange(e) {
-    const val = e.target.value
-    setCedula(val)
-    if (val.endsWith('\n') || val.endsWith('\r')) {
-      buscarEstudiante(val.trim())
-      e.target.value = ''
-    }
-  }
-
   function handleInputKeyDown(e) {
     if (e.key === 'Enter') {
       e.preventDefault()
-      buscarEstudiante(cedula)
+      buscarEstudiante(cedula.trim())
     }
   }
 
@@ -89,39 +99,55 @@ export function ScannerHub({ onNotice }) {
   }, [])
 
   useEffect(() => {
+    if (scanMode !== 'camera') return
     const containerEl = scannerContainerRef.current
-    if (!containerEl || scannerRef.current) return
+    if (!containerEl) return
 
     let mounted = true
-    let instance
-
+    let instance = null
     const scannerDiv = document.createElement('div')
     scannerDiv.id = 'scanner-view-' + Date.now()
+    scannerDiv.style.width = '100%'
+    scannerDiv.style.height = '100%'
     containerEl.appendChild(scannerDiv)
 
     async function startScanner() {
       try {
-        instance = new Html5Qrcode(scannerDiv.id)
+        instance = new Html5Qrcode(scannerDiv.id, {
+          verbose: false,
+          formatsToSupport: SCAN_FORMATS,
+        })
         await instance.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 250, height: 150 } },
+          {
+            fps: 15,
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
+              const qrboxSize = Math.floor(minEdge * 0.7)
+              return { width: qrboxSize, height: Math.floor(qrboxSize * 0.6) }
+            },
+            aspectRatio: 1.333,
+            disableFlip: false,
+          },
           (decodedText) => {
+            const text = (decodedText || '').trim()
+            const now = Date.now()
+            if (lastScan && text === lastScan.text && now - lastScan.ts < 2000) return
+            setLastScan({ text, ts: now })
             setFlashGreen(true)
-            setTimeout(() => setFlashGreen(false), 500)
-            buscarEstudiante(decodedText)
-            if (inputRef.current) inputRef.current.value = decodedText
+            setTimeout(() => setFlashGreen(false), 600)
+            if (inputRef.current) inputRef.current.value = text
+            buscarEstudiante(text)
           },
           () => {}
         )
-        if (!mounted) {
-          await instance.stop().catch(() => {})
-          return
+        if (mounted) setScanning(true)
+        else await instance.stop().catch(() => {})
+      } catch (err) {
+        if (mounted) {
+          setScanning(false)
+          setCameraError(err?.message || 'No se pudo iniciar la cámara')
         }
-        scannerRef.current = instance
-        setScanner(instance)
-        setScanning(true)
-      } catch {
-        if (mounted) setScanning(false)
       }
     }
 
@@ -129,65 +155,120 @@ export function ScannerHub({ onNotice }) {
 
     return () => {
       mounted = false
-      scannerRef.current = null
       ;(async () => {
         try {
           if (instance) {
-            await instance.stop()
-            await instance.clear()
+            await instance.stop().catch(() => {})
+            await instance.clear().catch(() => {})
           }
         } catch {}
-        if (containerEl && scannerDiv.parentNode === containerEl) {
-          containerEl.removeChild(scannerDiv)
-        }
+        try {
+          if (scannerDiv.parentNode === containerEl) containerEl.removeChild(scannerDiv)
+        } catch {}
       })()
     }
-  }, [])
+  }, [scanMode])
 
   return (
     <div className="grid h-[calc(100vh-70px)] grid-cols-12 gap-6 overflow-hidden p-6">
       <div className="col-span-5 flex flex-col gap-4">
-        <div
-          ref={scannerContainerRef}
-          className={`relative aspect-video overflow-hidden rounded-2xl bg-slate-900 ${
-            flashGreen ? 'ring-4 ring-success-400' : ''
-          }`}
-        >
-          {!scanning && (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
-              <IconCamera className="h-10 w-10" />
-              <p className="text-sm">Cámara no disponible</p>
-            </div>
-          )}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="h-1 w-3/4 animate-scan rounded-full bg-danger-400 opacity-70 shadow-lg shadow-danger-400/50" />
-          </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setScanMode('camera')}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
+              scanMode === 'camera'
+                ? 'bg-primary text-white'
+                : 'border border-slate-200 bg-white text-slate-600'
+            }`}
+          >
+            <IconCamera className="h-4 w-4" />
+            Cámara
+          </button>
+          <button
+            onClick={() => setScanMode('manual')}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition ${
+              scanMode === 'manual'
+                ? 'bg-primary text-white'
+                : 'border border-slate-200 bg-white text-slate-600'
+            }`}
+          >
+            <IconKeyboard className="h-4 w-4" />
+            Manual
+          </button>
         </div>
 
-        <div>
-          <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-700">
-            <IconKeyboard className="h-4 w-4" />
-            Cédula del Estudiante / Código de Barras
-          </label>
-          <input
-            ref={inputRef}
-            type="text"
-            className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-lg transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-50"
-            placeholder="Escanea o escribe el código..."
-            onChange={handleInputChange}
-            onKeyDown={handleInputKeyDown}
-            autoFocus
-          />
-          <p className="mt-1 text-xs text-slate-400">Escáner físico o ingreso manual + Enter</p>
-        </div>
+        {scanMode === 'camera' ? (
+          <>
+            <div
+              ref={scannerContainerRef}
+              className={`relative aspect-video overflow-hidden rounded-2xl bg-slate-900 ${
+                flashGreen ? 'ring-4 ring-success-400' : ''
+              }`}
+            >
+              {!scanning && (
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
+                  <IconCameraOff className="h-10 w-10" />
+                  <p className="text-sm font-medium">
+                    {cameraError || 'Iniciando cámara…'}
+                  </p>
+                  {cameraError && (
+                    <button
+                      onClick={() => setScanMode('manual')}
+                      className="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white"
+                    >
+                      Usar ingreso manual
+                    </button>
+                  )}
+                </div>
+              )}
+              {scanning && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="h-0.5 w-3/4 animate-scan rounded-full bg-danger-400 opacity-70 shadow-lg shadow-danger-400/50" />
+                </div>
+              )}
+            </div>
+            <div className="flex items-start gap-2 rounded-xl bg-blue-50 p-3 text-xs text-blue-700">
+              <IconBarcodeScanner className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Acerca el código QR o código de barras del carnet a la cámara. Se
+                aceptan QR, Code 128, Code 39, EAN y PDF417.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
+            <div className="mb-4 flex h-32 items-center justify-center rounded-xl bg-slate-50">
+              <IconKeyboard className="h-12 w-12 text-slate-300" />
+            </div>
+            <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-slate-700">
+              <IconBarcodeScanner className="h-4 w-4" />
+              Cédula del Estudiante / Código
+            </label>
+            <input
+              ref={inputRef}
+              type="text"
+              className="w-full rounded-xl border-2 border-slate-200 px-4 py-3 text-lg transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-50"
+              placeholder="Escanea o digita el código..."
+              value={cedula}
+              onChange={(e) => setCedula(e.target.value)}
+              onKeyDown={handleInputKeyDown}
+              autoFocus
+            />
+            <p className="mt-2 text-xs text-slate-400">
+              Presiona <kbd className="rounded bg-slate-100 px-1.5 py-0.5 font-mono">Enter</kbd> para buscar
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="col-span-7 flex flex-col">
         {scenario === SCENARIO.IDLE && !loading && (
           <div className="flex h-full flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white">
             <IconScan className="mb-3 h-16 w-16 text-slate-200" />
-            <h3 className="text-lg font-semibold text-slate-400">Esperando lectura de carnet</h3>
-            <p className="text-sm text-slate-300">o ingreso de cédula</p>
+            <h3 className="text-lg font-semibold text-slate-400">Esperando lectura</h3>
+            <p className="text-sm text-slate-300">
+              Apunta la cámara al código o digita la cédula
+            </p>
           </div>
         )}
 

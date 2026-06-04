@@ -1,5 +1,36 @@
 const prisma = require('../../shared/prisma/client');
-const configuracionService = require('../configuracion/configuracion.service');
+
+const DEFAULT_REGLAS = {
+  limite_reservas_activas: {
+    valor: 2,
+    descripcion: 'Max reservas activas simultaneas por usuario',
+  },
+  max_reservas_por_dia: {
+    valor: 1,
+    descripcion: 'Max reservas activas por usuario en un mismo dia',
+  },
+  anticipacion_reserva_min: {
+    valor: 30,
+    descripcion: 'Minutos minimos de anticipacion para crear reserva',
+  },
+  anticipacion_cancelacion_min: {
+    valor: 15,
+    descripcion: 'Minutos minimos de anticipacion para cancelar reserva',
+  },
+  umbral_noshow: {
+    valor: 3,
+    descripcion: 'Inasistencias acumuladas que activan suspension',
+  },
+  ventana_checkin_min: {
+    valor: 15,
+    descripcion: 'Minutos desde inicio del turno para hacer check-in',
+  },
+  dias_suspension_por_noshow: {
+    valor: 7,
+    descripcion:
+      'Dias de suspension automatica por alcanzar umbral de no_shows',
+  },
+};
 
 async function actualizarReglas(datos, idAdmin) {
   const claves = Object.keys(datos);
@@ -43,25 +74,19 @@ async function actualizarReglas(datos, idAdmin) {
     });
   }
 
-  await Promise.all(
-    Object.entries(DEFAULT_REGLAS).map(([clave, def]) =>
-      prisma.configuracion.upsert({
-        where: { clave },
-        update: {},
-        create: { clave, valor: String(def.valor), descripcion: def.descripcion },
-      })
-    )
-  );
-
   if (idAdmin && cambios.length > 0) {
-    await prisma.auditLog.create({
-      data: {
-        accion: 'actualizar_config',
-        entidad: 'configuracion',
-        detalle: JSON.stringify(cambios),
-        idUsuario: idAdmin,
-      },
-    });
+    try {
+      await prisma.auditLog.create({
+        data: {
+          accion: 'actualizar_config',
+          entidad: 'configuracion',
+          detalle: JSON.stringify(cambios),
+          idUsuario: idAdmin,
+        },
+      });
+    } catch (e) {
+      console.error('No se pudo registrar audit log:', e.message);
+    }
   }
 
   const filas = await prisma.configuracion.findMany({
@@ -84,43 +109,16 @@ async function actualizarReglas(datos, idAdmin) {
   };
 }
 
-async function obtenerAuditLog() {
-  return prisma.auditLog.findMany({
-    orderBy: { creadoEn: 'desc' },
-    take: 100,
-  });
+async function obtenerAuditLog(limite = 100) {
+  try {
+    return await prisma.auditLog.findMany({
+      orderBy: { creadoEn: 'desc' },
+      take: limite,
+    });
+  } catch (e) {
+    console.error('Error leyendo audit log:', e.message);
+    return [];
+  }
 }
 
-const DEFAULT_REGLAS = {
-  limite_reservas_activas: {
-    valor: 2,
-    descripcion: 'Max reservas activas simultaneas por usuario',
-  },
-  max_reservas_por_dia: {
-    valor: 1,
-    descripcion: 'Max reservas activas por usuario en un mismo dia',
-  },
-  anticipacion_reserva_min: {
-    valor: 30,
-    descripcion: 'Minutos minimos de anticipacion para crear reserva',
-  },
-  anticipacion_cancelacion_min: {
-    valor: 15,
-    descripcion: 'Minutos minimos de anticipacion para cancelar reserva',
-  },
-  umbral_noshow: {
-    valor: 3,
-    descripcion: 'Inasistencias acumuladas que activan suspension',
-  },
-  ventana_checkin_min: {
-    valor: 15,
-    descripcion: 'Minutos desde inicio del turno para hacer check-in',
-  },
-  dias_suspension_por_noshow: {
-    valor: 7,
-    descripcion:
-      'Dias de suspension automatica por alcanzar umbral de no_shows',
-  },
-};
-
-module.exports = { actualizarReglas };
+module.exports = { actualizarReglas, obtenerAuditLog };

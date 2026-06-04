@@ -11,33 +11,65 @@ import {
   mondayFromYMD,
   formatDayHeader,
   now,
+  nowMillis,
+  parseSlotMillis,
+  isWithinWindow,
 } from '../../utils/time'
-import { IconCalendar, IconX } from '../../components/shared/Icons'
+import { IconCalendar, IconChevronLeft, IconChevronRight, IconCheckCircle, IconXCircle, IconUsers, IconClock } from '../../components/shared/Icons'
+
+function getNextMonday(date) {
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = day === 0 ? 1 : 8 - day
+  d.setDate(d.getDate() + diff)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function getPrevMonday(date) {
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + (diff - 7))
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function ymd(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
 
 export function ExploradorFranjas({ onNotice }) {
-  const lunes = useMemo(() => mondayFromYMD(todayYMD()), [])
+  const today = now()
+  const initialMonday = useMemo(() => mondayFromYMD(todayYMD()), [])
 
-  const weekDays = useMemo(() => {
-    const days = []
-    for (let i = 0; i < 5; i++) {
-      const date = new Date(lunes)
-      date.setDate(date.getDate() + i)
-      days.push(date.toISOString().split('T')[0])
-    }
-    return days
-  }, [lunes])
-
-  const defaultDayIndex = useMemo(() => {
-    const d = now().day()
-    if (d === 0 || d === 6) return 0
-    return d - 1
-  }, [])
-
-  const [selectedDay, setSelectedDay] = useState(weekDays[defaultDayIndex])
+  const [semanaInicio, setSemanaInicio] = useState(initialMonday)
   const [modal, setModal] = useState({ open: false })
   const [pendiente, setPendiente] = useState(null)
 
-  const { data: franjas = [], isLoading } = useFranjas(lunes)
+  const weekDays = useMemo(() => {
+    const monday = new Date(`${semanaInicio}T00:00:00`)
+    const days = []
+    for (let i = 0; i < 5; i++) {
+      const date = new Date(monday)
+      date.setDate(monday.getDate() + i)
+      days.push(ymd(date))
+    }
+    return days
+  }, [semanaInicio])
+
+  const defaultDay = useMemo(() => {
+    const todayD = todayYMD()
+    if (weekDays.includes(todayD)) return todayD
+    return weekDays[0]
+  }, [weekDays])
+
+  const [selectedDay, setSelectedDay] = useState(defaultDay)
+
+  const { data: franjas = [], isLoading } = useFranjas(semanaInicio)
   const { data: reservas = [] } = useReservas()
   const { data: reglas } = useReglasReserva()
   const crearReserva = useCrearReserva()
@@ -51,13 +83,22 @@ export function ExploradorFranjas({ onNotice }) {
   }).length
 
   const franjasDelDia = useMemo(() => {
+    const ahora = nowMillis()
+    const anticipacion = reglas?.anticipacionReservaMin || 30
     return franjas
       .filter((f) => {
-        const ymd = String(f.fecha || '').split('T')[0]
-        return ymd === selectedDay
+        const fechaStr = String(f.fecha || '').split('T')[0]
+        return fechaStr === selectedDay
       })
-      .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))
-  }, [franjas, selectedDay])
+      .map((f) => {
+        const inicio = parseSlotMillis(f.fecha, f.horaInicio)
+        const fin = parseSlotMillis(f.fecha, f.horaFin)
+        const yaPaso = fin < ahora
+        const esPronto = inicio - ahora < anticipacion * 60 * 1000
+        return { ...f, inicio, fin, yaPaso, esPronto }
+      })
+      .sort((a, b) => a.inicio - b.inicio)
+  }, [franjas, selectedDay, reglas])
 
   function pedirReserva(franja) {
     setPendiente(franja)
@@ -88,8 +129,16 @@ export function ExploradorFranjas({ onNotice }) {
     }
   }
 
+  function cambiarSemana(direccion) {
+    const mondayDate = new Date(`${semanaInicio}T00:00:00`)
+    if (direccion === 'next') mondayDate.setDate(mondayDate.getDate() + 7)
+    else mondayDate.setDate(mondayDate.getDate() - 7)
+    setSemanaInicio(ymd(mondayDate))
+    setSelectedDay(ymd(new Date(`${semanaInicio}T00:00:00`)))
+  }
+
   return (
-    <div className="space-y-4 pt-2">
+    <div className="space-y-5 pt-2 md:pt-0">
       <ActionModal
         open={modal.open}
         type={modal.type}
@@ -101,43 +150,62 @@ export function ExploradorFranjas({ onNotice }) {
         cancelLabel="Volver"
       />
 
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Explorar franjas</h1>
-        <p className="text-sm text-slate-500">Selecciona un día para ver disponibilidad</p>
+      <div className="flex items-baseline justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Reservar</h1>
+          <p className="text-sm text-slate-500">Elige un día para ver disponibilidad</p>
+        </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {weekDays.map((day) => {
-          const isSelected = day === selectedDay
-          const isToday = day === todayYMD()
-          return (
-            <button
-              key={day}
-              onClick={() => setSelectedDay(day)}
-              className={`flex shrink-0 flex-col items-center rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
-                isSelected
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:border-primary'
-              }`}
-            >
-              <span className="text-xs">{formatDayHeader(day).split(' ')[0]}</span>
-              <span className="text-base font-bold">
-                {formatDayHeader(day).split(' ')[1]?.split('/')[0]}
-              </span>
-              {isToday && (
-                <span className={`text-[10px] ${isSelected ? 'text-white/80' : 'text-primary'}`}>
-                  Hoy
+      <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white p-2">
+        <button
+          onClick={() => cambiarSemana('prev')}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100"
+          aria-label="Semana anterior"
+        >
+          <IconChevronLeft className="h-5 w-5" />
+        </button>
+        <div className="flex flex-1 gap-2 overflow-x-auto pb-1">
+          {weekDays.map((day) => {
+            const isSelected = day === selectedDay
+            const isToday = day === todayYMD()
+            const dayDate = new Date(`${day}T00:00:00`)
+            return (
+              <button
+                key={day}
+                onClick={() => setSelectedDay(day)}
+                className={`flex min-w-[64px] shrink-0 flex-col items-center rounded-xl px-3 py-2 transition ${
+                  isSelected
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span className={`text-[10px] font-semibold uppercase ${isSelected ? 'text-white/80' : 'text-slate-400'}`}>
+                  {formatDayHeader(day).split(' ')[0]}
                 </span>
-              )}
-            </button>
-          )
-        })}
+                <span className="text-lg font-bold leading-tight">
+                  {dayDate.getDate()}
+                </span>
+                {isToday && (
+                  <span className={`text-[10px] font-medium ${isSelected ? 'text-white/80' : 'text-primary'}`}>
+                    Hoy
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <button
+          onClick={() => cambiarSemana('next')}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100"
+          aria-label="Semana siguiente"
+        >
+          <IconChevronRight className="h-5 w-5" />
+        </button>
       </div>
 
       {isLoading ? (
         <div className="space-y-3">
-          <CardSkeleton />
-          <CardSkeleton />
           <CardSkeleton />
           <CardSkeleton />
           <CardSkeleton />
@@ -155,7 +223,9 @@ export function ExploradorFranjas({ onNotice }) {
             const agotado = franja.cuposDisponibles <= 0
             const limiteActivo = reservas.length >= maxActivas
             const limiteDia = reservasHoy >= maxDia
-            const deshabilitado = reservada || agotado || limiteActivo || limiteDia
+            const pasada = franja.yaPaso
+
+            const deshabilitado = reservada || agotado || limiteActivo || limiteDia || pasada
 
             const ocupacion = ((franja.capacidadMaxima - franja.cuposDisponibles) / franja.capacidadMaxima) * 100
             const barColor =
@@ -166,51 +236,65 @@ export function ExploradorFranjas({ onNotice }) {
                 : 'bg-success-500'
 
             let estadoLabel = 'Reservar'
-            if (reservada) estadoLabel = 'Reservada'
-            else if (agotado) estadoLabel = 'Agotado'
-            else if (limiteActivo) estadoLabel = 'Límite activo'
-            else if (limiteDia) estadoLabel = 'Tope diario'
+            let estadoColor = 'bg-primary text-white hover:bg-primary-700'
+            if (pasada) { estadoLabel = 'Pasado'; estadoColor = 'bg-slate-100 text-slate-400' }
+            else if (reservada) { estadoLabel = 'Ya reservada'; estadoColor = 'bg-slate-100 text-slate-400' }
+            else if (agotado) { estadoLabel = 'Agotado'; estadoColor = 'bg-slate-100 text-slate-400' }
+            else if (limiteActivo) { estadoLabel = 'Límite activo'; estadoColor = 'bg-slate-100 text-slate-400' }
+            else if (limiteDia) { estadoLabel = 'Tope diario'; estadoColor = 'bg-slate-100 text-slate-400' }
+            else if (franja.esPronto) { estadoLabel = 'Reservar pronto'; estadoColor = 'bg-warning-500 text-white hover:bg-warning-600' }
 
             return (
               <div
                 key={franja.id}
-                className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft"
+                className={`rounded-2xl border bg-white p-4 shadow-sm transition ${
+                  pasada ? 'border-slate-100 opacity-60' : 'border-slate-200'
+                }`}
               >
-                <div className="min-w-[60px] text-center">
-                  <p className="text-lg font-bold text-slate-800">{franja.horaInicio}</p>
-                  <p className="text-xs text-slate-400">{franja.horaFin}</p>
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">
-                      <strong className="text-slate-800">{franja.cuposDisponibles}</strong> / {franja.capacidadMaxima} cupos
-                    </span>
-                    <SaturacionBadge nivel={franja.saturacion} />
+                <div className="flex items-center gap-4">
+                  <div className="flex w-20 shrink-0 flex-col items-center justify-center rounded-xl bg-slate-50 py-3">
+                    <IconClock className="mb-1 h-4 w-4 text-slate-400" />
+                    <p className="text-lg font-bold text-slate-800">{franja.horaInicio}</p>
+                    <p className="text-[10px] text-slate-500">a {franja.horaFin}</p>
                   </div>
-                  <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
-                    <div
-                      className={`h-full rounded-full transition-all ${barColor}`}
-                      style={{ width: `${Math.min(ocupacion, 100)}%` }}
-                    />
-                  </div>
-                </div>
 
-                <button
-                  onClick={() => pedirReserva(franja)}
-                  disabled={deshabilitado || crearReserva.isPending}
-                  className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                    deshabilitado
-                      ? 'cursor-not-allowed bg-slate-100 text-slate-400'
-                      : 'bg-primary text-white hover:bg-primary-700'
-                  }`}
-                >
-                  {crearReserva.isPending ? '...' : estadoLabel}
-                </button>
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                        <IconUsers className="h-4 w-4 text-slate-400" />
+                        <strong className="text-slate-800">{franja.cuposDisponibles}</strong>
+                        <span>/ {franja.capacidadMaxima} cupos</span>
+                      </div>
+                      <SaturacionBadge nivel={franja.saturacion} />
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className={`h-full transition-all ${barColor}`}
+                        style={{ width: `${Math.min(ocupacion, 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => pedirReserva(franja)}
+                    disabled={deshabilitado || crearReserva.isPending}
+                    className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[0.98] ${estadoColor} ${
+                      deshabilitado || crearReserva.isPending ? 'cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {crearReserva.isPending ? '...' : estadoLabel}
+                  </button>
+                </div>
               </div>
             )
           })}
         </div>
+      )}
+
+      {franjasDelDia.length > 0 && (
+        <p className="text-center text-xs text-slate-400">
+          {franjasDelDia.filter((f) => !f.yaPaso).length} horarios disponibles para este día
+        </p>
       )}
     </div>
   )

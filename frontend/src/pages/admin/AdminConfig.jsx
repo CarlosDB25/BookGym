@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useReglasReserva } from '../../hooks/useReglasReserva'
 import { useActualizarReglas, usePlantillas, useActualizarPlantilla, useAuditLog } from '../../hooks/useAdmin'
 import { CardSkeleton } from '../../components/ui/SkeletonLoader'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { IconSave, IconClock, IconAlertTriangle, IconCalendar, IconUsers, IconBan, IconUserX, IconSliders, IconHistory } from '../../components/shared/Icons'
+import { IconSave, IconClock, IconAlertTriangle, IconCalendar, IconUsers, IconBan, IconUserX, IconSliders, IconHistory, IconCheck, IconX, IconPencil } from '../../components/shared/Icons'
 
 const TABS = [
   { id: 'reserva', label: 'Reglas de Reserva', icon: IconCalendar },
@@ -26,6 +26,14 @@ const FIELD_META = {
   umbralNoshow: { label: 'Umbral de no-show', icon: IconBan, min: 1, max: 20, step: 1, tab: 'checkin', unit: 'inasistencias' },
   diasSuspensionPorNoshow: { label: 'Días de suspensión', icon: IconUserX, min: 1, max: 90, step: 1, tab: 'checkin', unit: 'días' },
 }
+
+const DIAS_SEMANA = [
+  { id: 'lunes', label: 'Lunes' },
+  { id: 'martes', label: 'Martes' },
+  { id: 'miercoles', label: 'Miércoles' },
+  { id: 'jueves', label: 'Jueves' },
+  { id: 'viernes', label: 'Viernes' },
+]
 
 function ReservaTab({ fields, formValues, reglas, handleChange }) {
   return (
@@ -68,25 +76,138 @@ function ReservaTab({ fields, formValues, reglas, handleChange }) {
   )
 }
 
-function PlantillaCard({ plantilla, onNotice }) {
-  const queryClient = useQueryClient()
-  const actualizarPlantilla = useActualizarPlantilla()
+function PlantillaEditModal({ plantilla, onClose, onSave, guardando }) {
   const [horaInicio, setHoraInicio] = useState(plantilla.horaInicio)
   const [horaFin, setHoraFin] = useState(plantilla.horaFin)
   const [capacidadMaxima, setCapacidadMaxima] = useState(plantilla.capacidadMaxima)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    await onSave({
+      horaInicio,
+      horaFin,
+      capacidadMaxima: Number(capacidadMaxima),
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-lg font-bold text-slate-800 capitalize">
+            Editar {plantilla.diaSemana}
+          </h3>
+          <button onClick={onClose} className="rounded-lg p-1 hover:bg-slate-100">
+            <IconX className="h-5 w-5 text-slate-500" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Hora de inicio</label>
+            <input
+              type="time"
+              value={horaInicio}
+              onChange={(e) => setHoraInicio(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Hora de fin</label>
+            <input
+              type="time"
+              value={horaFin}
+              onChange={(e) => setHoraFin(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Capacidad máxima</label>
+            <input
+              type="number"
+              value={capacidadMaxima}
+              onChange={(e) => setCapacidadMaxima(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              min={1}
+              required
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={guardando}
+              className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
+            >
+              {guardando ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function PlantillasTab({ onNotice }) {
+  const queryClient = useQueryClient()
+  const { data: plantillas = [], isLoading } = usePlantillas()
+  const actualizarPlantilla = useActualizarPlantilla()
+  const [editing, setEditing] = useState(null)
   const [guardando, setGuardando] = useState(false)
 
-  async function handleGuardar() {
+  const slotsUnicos = useMemo(() => {
+    const set = new Set()
+    plantillas.forEach((p) => set.add(`${p.horaInicio}-${p.horaFin}`))
+    return Array.from(set)
+      .sort((a, b) => a.split('-')[0].localeCompare(b.split('-')[0]))
+      .map((s) => {
+        const [hi, hf] = s.split('-')
+        return { key: s, horaInicio: hi, horaFin: hf }
+      })
+  }, [plantillas])
+
+  const mapa = useMemo(() => {
+    const m = new Map()
+    plantillas.forEach((p) => {
+      m.set(`${p.diaSemana}|${p.horaInicio}-${p.horaFin}`, p)
+    })
+    return m
+  }, [plantillas])
+
+  async function handleToggle(diaSemana, slot) {
+    const key = `${diaSemana}|${slot.key}`
+    const actual = mapa.get(key)
+    try {
+      if (actual) {
+        await actualizarPlantilla.mutateAsync({
+          id: actual.id,
+          activa: !actual.activa,
+        })
+        onNotice?.('success', `Franja ${actual.activa ? 'desactivada' : 'activada'}`)
+      }
+    } catch (err) {
+      onNotice?.('error', err?.response?.data?.error || 'Error al cambiar estado')
+    }
+  }
+
+  async function handleSave(datos) {
+    if (!editing) return
     setGuardando(true)
     try {
       await actualizarPlantilla.mutateAsync({
-        id: plantilla.id,
-        horaInicio,
-        horaFin,
-        capacidadMaxima: Number(capacidadMaxima),
+        id: editing.id,
+        ...datos,
       })
-      queryClient.invalidateQueries({ queryKey: ['plantillas'] })
+      queryClient.invalidateQueries({ queryKey: ['admin-plantillas'] })
       onNotice?.('success', 'Plantilla actualizada')
+      setEditing(null)
     } catch (err) {
       onNotice?.('error', err?.response?.data?.error || 'Error al actualizar')
     } finally {
@@ -94,82 +215,8 @@ function PlantillaCard({ plantilla, onNotice }) {
     }
   }
 
-  async function handleToggleActiva() {
-    try {
-      await actualizarPlantilla.mutateAsync({
-        id: plantilla.id,
-        activa: !plantilla.activa,
-      })
-      queryClient.invalidateQueries({ queryKey: ['plantillas'] })
-      onNotice?.('success', `Plantilla ${plantilla.activa ? 'desactivada' : 'activada'}`)
-    } catch (err) {
-      onNotice?.('error', err?.response?.data?.error || 'Error al cambiar estado')
-    }
-  }
-
-  return (
-    <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-bold capitalize text-slate-800">{plantilla.diaSemana}</span>
-        <button
-          type="button"
-          onClick={handleToggleActiva}
-          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-            plantilla.activa ? 'bg-primary' : 'bg-slate-200'
-          }`}
-          role="switch"
-          aria-checked={plantilla.activa}
-        >
-          <span
-            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-              plantilla.activa ? 'translate-x-5' : 'translate-x-0.5'
-            }`}
-          />
-        </button>
-      </div>
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <input
-            type="time"
-            value={horaInicio}
-            onChange={(e) => setHoraInicio(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
-          />
-          <span className="text-slate-400">—</span>
-          <input
-            type="time"
-            value={horaFin}
-            onChange={(e) => setHoraFin(e.target.value)}
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-slate-500">Capacidad:</label>
-          <input
-            type="number"
-            value={capacidadMaxima}
-            onChange={(e) => setCapacidadMaxima(e.target.value)}
-            className="w-20 rounded-lg border border-slate-200 px-3 py-1.5 text-sm"
-            min={1}
-          />
-        </div>
-        <button
-          onClick={handleGuardar}
-          disabled={guardando}
-          className="w-full rounded-lg bg-primary py-1.5 text-xs font-semibold text-white transition hover:bg-primary-700 disabled:opacity-50"
-        >
-          {guardando ? 'Guardando...' : 'Guardar'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function PlantillasTab({ onNotice }) {
-  const { data: plantillas = [], isLoading } = usePlantillas()
-
   if (isLoading) {
-    return <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div>
+    return <div className="space-y-2"><CardSkeleton /><CardSkeleton /></div>
   }
 
   if (plantillas.length === 0) {
@@ -182,17 +229,120 @@ function PlantillasTab({ onNotice }) {
     )
   }
 
+  const activasCount = plantillas.filter((p) => p.activa).length
+  const totalCount = plantillas.length
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {plantillas.map((p) => (
-        <PlantillaCard key={p.id} plantilla={p} onNotice={onNotice} />
-      ))}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+        <div>
+          <p className="font-semibold text-slate-800">Franjas semanales</p>
+          <p className="text-xs text-slate-500">Marca las casillas para activar o desactivar</p>
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded bg-primary" />
+            <span className="font-medium text-slate-600">Activa</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded border-2 border-slate-300 bg-white" />
+            <span className="font-medium text-slate-600">Inactiva</span>
+          </span>
+          <span className="rounded-full bg-primary/10 px-3 py-1 font-bold text-primary">
+            {activasCount}/{totalCount}
+          </span>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b border-slate-200 bg-slate-50">
+              <th className="sticky left-0 z-10 bg-slate-50 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
+                Día
+              </th>
+              {slotsUnicos.map((slot) => (
+                <th key={slot.key} className="px-2 py-3 text-center text-xs font-semibold text-slate-600">
+                  <div className="font-mono">{slot.horaInicio}</div>
+                  <div className="text-[10px] font-normal text-slate-400">a {slot.horaFin}</div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {DIAS_SEMANA.map((dia) => (
+              <tr key={dia.id} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/50">
+                <td className="sticky left-0 z-10 bg-white px-3 py-3 text-sm font-semibold text-slate-700 group-hover:bg-slate-50">
+                  {dia.label}
+                </td>
+                {slotsUnicos.map((slot) => {
+                  const key = `${dia.id}|${slot.key}`
+                  const plantilla = mapa.get(key)
+                  const activa = plantilla?.activa || false
+                  return (
+                    <td key={slot.key} className="px-2 py-3 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => plantilla && handleToggle(dia.id, slot)}
+                          disabled={!plantilla}
+                          className={`relative flex h-9 w-9 items-center justify-center rounded-lg border-2 transition-all ${
+                            activa
+                              ? 'border-primary bg-primary text-white shadow-sm hover:scale-105'
+                              : plantilla
+                              ? 'border-slate-300 bg-white text-slate-300 hover:border-primary/50'
+                              : 'cursor-not-allowed border-dashed border-slate-200 bg-slate-50'
+                          }`}
+                          title={
+                            plantilla
+                              ? `${plantilla.horaInicio}-${plantilla.horaFin} · Capacidad: ${plantilla.capacidadMaxima}`
+                              : 'Sin plantilla'
+                          }
+                        >
+                          {activa && <IconCheck className="h-5 w-5" />}
+                        </button>
+                        {plantilla && (
+                          <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                            <span>{plantilla.capacidadMaxima}</span>
+                            <button
+                              type="button"
+                              onClick={() => setEditing(plantilla)}
+                              className="rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-primary"
+                              title="Editar hora/capacidad"
+                            >
+                              <IconPencil className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs text-slate-500">
+        Haz clic en una casilla para activar o desactivar la franja. Usa el ícono de lápiz para
+        editar la hora o capacidad de una franja específica.
+      </p>
+
+      {editing && (
+        <PlantillaEditModal
+          plantilla={editing}
+          onClose={() => setEditing(null)}
+          onSave={handleSave}
+          guardando={guardando}
+        />
+      )}
     </div>
   )
 }
 
 function AuditTab() {
-  const { data: logs = [], isLoading } = useAuditLog()
+  const { data: logs = [], isLoading, error } = useAuditLog()
 
   if (isLoading) {
     return <div className="space-y-2"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div>
@@ -203,7 +353,7 @@ function AuditTab() {
       <EmptyState
         icon={IconHistory}
         title="Sin cambios registrados"
-        message="Aún no se han realizado cambios en la configuración del sistema."
+        message={error ? `Error al cargar: ${error.message}` : 'Aún no se han realizado cambios en la configuración del sistema.'}
       />
     )
   }
@@ -216,18 +366,22 @@ function AuditTab() {
         return (
           <div key={log.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-medium text-slate-700">{log.idUsuario}</span>
-              <span className="text-xs text-slate-400">{new Date(log.creadoEn).toLocaleString('es-CO')}</span>
+              <span className="font-medium text-slate-700">Admin: {log.idUsuario}</span>
+              <span className="text-xs text-slate-400">
+                {new Date(log.creadoEn).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
+              </span>
             </div>
-            <p className="mt-1 text-xs text-slate-500">{log.accion} · {log.entidad}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {log.accion === 'actualizar_config' ? 'Actualización de reglas operativas' : log.accion} · {log.entidad}
+            </p>
             {cambios.length > 0 && (
-              <div className="mt-2 space-y-1">
+              <div className="mt-3 space-y-1.5 rounded-lg bg-white p-3">
                 {cambios.map((c, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs">
-                    <span className="font-mono text-slate-600">{c.clave}:</span>
-                    <span className="text-danger-500 line-through">{c.valorAnterior}</span>
+                  <div key={i} className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="font-mono font-semibold text-slate-700">{c.clave}:</span>
+                    <span className="text-danger-500 line-through">{c.valorAnterior || '—'}</span>
                     <span className="text-slate-400">→</span>
-                    <span className="font-medium text-success-600">{c.valorNuevo}</span>
+                    <span className="font-bold text-success-600">{c.valorNuevo}</span>
                   </div>
                 ))}
               </div>
