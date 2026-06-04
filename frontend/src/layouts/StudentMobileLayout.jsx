@@ -57,7 +57,7 @@ function MobileBottomNav({ location }) {
 function DesktopSidebar({ location, usuario, onLogout }) {
   const { isDark, toggle } = useDarkMode()
   return (
-    <aside className="hidden md:flex md:w-64 md:flex-col md:border-r md:border-slate-200 md:bg-white dark:md:border-slate-800">
+    <aside className="hidden md:sticky md:top-0 md:flex md:h-screen md:w-64 md:shrink-0 md:flex-col md:border-r md:border-slate-200 md:bg-white md:overflow-y-auto dark:md:border-slate-800">
       <div className="flex items-center gap-2 border-b border-slate-200 px-6 py-5 dark:border-slate-800">
         <Logo size={32} />
         <span className="text-xl font-bold text-slate-900">
@@ -123,12 +123,13 @@ function DesktopSidebar({ location, usuario, onLogout }) {
 export function StudentMobileLayout({ usuario, onLogout }) {
   const location = useLocation()
   const { isDark, toggle } = useDarkMode()
+  const enPerfil = location.pathname === '/perfil'
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 md:flex">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 md:flex md:items-start">
       <DesktopSidebar location={location} usuario={usuario} onLogout={onLogout} />
 
-      <div className="flex min-h-screen w-full flex-col bg-slate-50 dark:bg-slate-950 md:flex-1">
+      <div className="flex min-h-screen w-full flex-col bg-slate-50 dark:bg-slate-950 md:min-h-0 md:flex-1">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur-lg dark:border-slate-800 dark:bg-slate-900/85 md:hidden">
           <div className="mx-auto flex max-w-md items-center justify-between">
             <div className="flex items-center gap-2">
@@ -146,12 +147,14 @@ export function StudentMobileLayout({ usuario, onLogout }) {
               >
                 {isDark ? <IconSun className="h-4 w-4" /> : <IconMoon className="h-4 w-4" />}
               </button>
-              <button
-                onClick={onLogout}
-                className="rounded-lg bg-danger-50 px-2.5 py-1 text-xs font-semibold text-danger-600 transition hover:bg-danger-100 dark:bg-danger-900/30"
-              >
-                Salir
-              </button>
+              {!enPerfil && (
+                <button
+                  onClick={onLogout}
+                  className="rounded-lg bg-danger-50 px-2.5 py-1 text-xs font-semibold text-danger-600 transition hover:bg-danger-100 dark:bg-danger-900/30"
+                >
+                  Salir
+                </button>
+              )}
             </div>
           </div>
         </header>
