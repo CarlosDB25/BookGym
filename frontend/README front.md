@@ -9,7 +9,7 @@ Cliente web del sistema de reservas de gimnasio universitario con dos experienci
 | Tecnología | Versión | Uso |
 |---|---|---|
 | React | 19 | UI declarativa por componentes |
-| Vite | 8 | Bundler y dev server |
+| Vite | 6 | Bundler y dev server |
 | Axios | 1.13 | Cliente HTTP con interceptores |
 | TanStack Query | 5.95 | Fetch, caché, polling e invalidaciones |
 | Tailwind CSS | 3.4 | Estilos utilitarios |
@@ -218,9 +218,9 @@ Cada hook encapsula una consulta o mutación con su propia configuración de cac
 
 | Ruta | Página | Descripción |
 |---|---|---|
-| `/admin` | `DashboardAnalitico` | KPIs, gráficos de ocupación, donut de estados, tendencia |
+| `/admin` | `DashboardAnalitico` | KPIs con sparklines, gráficos de barras, donut de estados, mapa de calor, tendencia, filtros semana/diario/mensual/siempre |
 | `/admin/scanner` | `ScannerHub` | Escáner QR + ingreso manual para check-in administrativo |
-| `/admin/usuarios` | `AdminUsuarios` | Tabla de usuarios con filtros, suspensión manual, historial |
+| `/admin/usuarios` | `AdminUsuarios` | Tabla de usuarios con búsqueda por ID, filtros, suspensión manual, historial de auditoría |
 | `/admin/config` | `AdminConfig` | Sliders para configurar reglas operativas (7 parámetros) |
 
 ### Públicas

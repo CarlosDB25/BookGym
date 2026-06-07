@@ -355,6 +355,7 @@ async function recomendaciones(limite = 5, usuarioId = null) {
     .filter((f) => !activeSlotKeys.has(`${f.fecha}__${f.horaInicio}`));
 
   const maxPorDia = await leerConfigConDefault('max_reservas_por_dia', 1, 'Maximo de reservas por dia');
+  const limiteActivas = await leerConfigConDefault('limite_reservas_activas', 3, 'Limite de reservas activas');
 
   const byKey = new Map();
   for (const c of candidatas) {
@@ -364,6 +365,12 @@ async function recomendaciones(limite = 5, usuarioId = null) {
   const deduped = [...byKey.values()].sort((a, b) => b.score - a.score);
 
   const usedDays = {};
+  for (const r of (reservasUsuario || [])) {
+    if (r.estado === 'activa' && r.franja?.fecha) {
+      const fechaStr = r.franja.fecha.toISOString().slice(0, 10);
+      usedDays[fechaStr] = (usedDays[fechaStr] || 0) + 1;
+    }
+  }
   const mejoresMomentos = [];
   for (const c of deduped) {
     const dayCount = usedDays[c.fecha] || 0;
@@ -425,6 +432,8 @@ async function recomendaciones(limite = 5, usuarioId = null) {
     totalFranjasAnalizadas: franjasEvaluadas.length,
     mejoresMomentos,
     evitando,
+    limiteActivas,
+    totalActivas: (reservasUsuario || []).filter((r) => r.estado === 'activa').length,
   };
 
   if (perfilUsuario) resultado.perfilUsuario = perfilUsuario;
@@ -543,7 +552,7 @@ async function heatmap(tipo, fecha) {
     where: { fecha: { gte: inicio, lt: fin } },
     include: {
       plantilla: true,
-      reservas: { where: { estado: { not: 'cancelada' } }, select: { id: true } },
+      reservas: { where: { estado: { not: 'cancelada' } }, select: { id: true, estado: true } },
     },
     orderBy: [{ fecha: 'asc' }, { plantilla: { horaInicio: 'asc' } }],
   }));
@@ -560,10 +569,15 @@ async function heatmap(tipo, fecha) {
     const dia = f.plantilla.diaSemana;
     const hora = f.plantilla.horaInicio;
     const key = `${dia}_${hora}`;
-    if (!mapa[key]) mapa[key] = { dia, horaInicio: hora, totalCapacidad: 0, totalOcupadas: 0, ocurrencias: 0 };
+    if (!mapa[key]) mapa[key] = { dia, horaInicio: hora, totalCapacidad: 0, totalOcupadas: 0, activas: 0, completadas: 0, noShows: 0, ocurrencias: 0 };
     mapa[key].totalCapacidad += f.plantilla.capacidadMaxima;
     mapa[key].totalOcupadas += f.reservas.length;
     mapa[key].ocurrencias += 1;
+    for (const r of f.reservas) {
+      if (r.estado === 'activa') mapa[key].activas += 1;
+      else if (r.estado === 'completada') mapa[key].completadas += 1;
+      else if (r.estado === 'no_show') mapa[key].noShows += 1;
+    }
   }
 
   const filas = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes']
@@ -575,12 +589,15 @@ async function heatmap(tipo, fecha) {
         const key = `${dia}_${hora}`;
         const data = mapa[key];
         if (!data || data.ocurrencias === 0) {
-          return { hora, ocupacion: 0, ocurrencias: 0, activa: false };
+          return { hora, ocupacion: 0, activas: 0, completadas: 0, noShows: 0, ocurrencias: 0, activa: false };
         }
         const ocupacion = Math.round((data.totalOcupadas / Math.max(1, data.totalCapacidad)) * 100);
         return {
           hora,
           ocupacion: Math.min(100, ocupacion),
+          activas: data.activas,
+          completadas: data.completadas,
+          noShows: data.noShows,
           ocurrencias: data.ocurrencias,
           activa: true,
         };
@@ -671,11 +688,12 @@ async function analisis(tipo, fecha) {
   for (const f of franjas) {
     const diaSem = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'][f.fecha.getUTCDay()];
     const clave = tipo === 'mes' ? `${f.fecha.getUTCFullYear()}-${String(f.fecha.getUTCMonth() + 1).padStart(2, '0')}-${String(f.fecha.getUTCDate()).padStart(2, '0')}` : diaSem;
-    if (!desglose[clave]) desglose[clave] = { periodo: clave, capacidad: 0, reservadas: 0, noShows: 0, franjas: 0 };
+    if (!desglose[clave]) desglose[clave] = { periodo: clave, capacidad: 0, reservadas: 0, completadas: 0, noShows: 0, franjas: 0 };
     desglose[clave].capacidad += f.plantilla.capacidadMaxima;
     desglose[clave].franjas += 1;
     for (const r of f.reservas) {
       if (r.estado === 'activa') desglose[clave].reservadas++;
+      else if (r.estado === 'completada') desglose[clave].completadas++;
       else if (r.estado === 'no_show') desglose[clave].noShows++;
     }
   }
@@ -684,13 +702,25 @@ async function analisis(tipo, fecha) {
     periodo: d.periodo,
     capacidad: d.capacidad,
     reservadas: d.reservadas,
-    ocupacion: d.capacidad > 0 ? Math.round((d.reservadas / d.capacidad) * 100) : 0,
+    completadas: d.completadas,
+    ocupacion: d.capacidad > 0 ? Math.round(((d.reservadas + d.completadas) / d.capacidad) * 100) : 0,
     noShows: d.noShows,
-    tasaNoShow: d.reservadas + d.noShows > 0 ? Math.round((d.noShows / (d.reservadas + d.noShows)) * 100) : 0,
+    tasaNoShow: d.reservadas + d.completadas + d.noShows > 0 ? Math.round((d.noShows / (d.reservadas + d.completadas + d.noShows)) * 100) : 0,
     franjas: d.franjas,
   }));
 
   const labels = { dia: 'Día', semana: 'Semana', mes: 'Mes' };
+
+  const totalCompletadas = franjas.reduce((sum, f) => sum + f.reservas.filter(r => r.estado === 'completada').length, 0);
+
+  let suspendidos = 0;
+  try {
+    suspendidos = await withTimeout(prisma.suspension.count({
+      where: { fechaFin: { gte: new Date() }, activa: true },
+    }));
+  } catch (e) {
+    console.warn('Error contando suspensiones en analisis:', e.message);
+  }
 
   return {
     tipo,
@@ -700,9 +730,11 @@ async function analisis(tipo, fecha) {
       capacidad: actual.capacidad,
       disponibles: actual.disponibles,
       reservadas: actual.reservadas,
+      completadas: totalCompletadas,
       ocupacionPromedio: actual.ocupacion,
       cambioPeriodoAnterior: cambioStr,
       tasaNoShow: actual.tasaNoShow,
+      suspendidos,
     },
     horasPico: actual.pico,
     horasValle: actual.valle,

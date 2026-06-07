@@ -75,7 +75,8 @@ Comportamientos:
 - `POST /api/reservas/:id/check-in`
 - `GET /api/metricas/recomendaciones?limite=N`
 - `GET /api/metricas/resumen?fecha=YYYY-MM-DD`
-- `GET /api/metricas/analisis?tipo=semana|dia|mes&fecha=YYYY-MM-DD`
+- `GET /api/metricas/analisis?tipo=semana|dia|mes|todo&fecha=YYYY-MM-DD`
+- `GET /api/metricas/heatmap?tipo=semana|dia|mes|todo&fecha=YYYY-MM-DD`
 - `GET /api/configuracion/reglas-reserva`
 - `GET /api/admin/suspensiones`
 - `POST /api/admin/suspensiones`

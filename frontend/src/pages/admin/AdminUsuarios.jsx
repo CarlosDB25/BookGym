@@ -6,12 +6,13 @@ import {
   getPaginationRowModel,
   flexRender,
   createColumnHelper,
+  getFilteredRowModel,
 } from '@tanstack/react-table'
-import { useAdminSuspensiones, useLevantarSuspension, useSuspensionHistorial } from '../../hooks/useAdmin'
+import { useAdminSuspensiones, useLevantarSuspension, useSuspensionHistorial, useCrearSuspension } from '../../hooks/useAdmin'
 import { ActionModal } from '../../components/ui/ActionModal'
 import { CardSkeleton } from '../../components/ui/SkeletonLoader'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { IconUsers, IconShieldAlert, IconAlertTriangle, IconChevronUp, IconChevronDown, IconChevronLeft, IconChevronRight, IconX, IconUserCheck, IconFileText, IconHistory } from '../../components/shared/Icons'
+import { IconUsers, IconShieldAlert, IconAlertTriangle, IconChevronUp, IconChevronDown, IconChevronLeft, IconChevronRight, IconX, IconUserCheck, IconFileText, IconHistory, IconSearch } from '../../components/shared/Icons'
 import { motion, AnimatePresence } from 'framer-motion' // eslint-disable-line no-unused-vars
 
 const STATUS_BADGE = {
@@ -76,19 +77,31 @@ function SuspensionHistory() {
 export function AdminUsuarios({ onNotice }) {
   const [tab, setTab] = useState('miembros')
   const [filter, setFilter] = useState('todos')
+  const [searchId, setSearchId] = useState('')
   const [selectedUser, setSelectedUser] = useState(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [modal, setModal] = useState({ open: false })
   const [justificacion, setJustificacion] = useState('')
+  const [suspensionModal, setSuspensionModal] = useState({ open: false })
+  const [suspensionForm, setSuspensionForm] = useState({ motivo: '', fechaFin: '' })
 
   const { data: suspensiones = [], isLoading } = useAdminSuspensiones()
   const levantar = useLevantarSuspension()
+  const crearSuspension = useCrearSuspension()
 
   const filteredData = useMemo(() => {
-    if (filter === 'suspendidos') return suspensiones.filter((s) => s.activa)
-    if (filter === 'riesgo') return suspensiones.filter((s) => !s.activa && s.noshowCount >= 2)
-    return suspensiones
-  }, [suspensiones, filter])
+    let data = suspensiones
+    if (filter === 'suspendidos') data = data.filter((s) => s.activa)
+    else if (filter === 'riesgo') data = data.filter((s) => !s.activa && s.noshowCount >= 2)
+    if (searchId.trim()) {
+      const q = searchId.trim().toLowerCase()
+      data = data.filter((s) =>
+        (s.usuarioId && String(s.usuarioId).toLowerCase().includes(q)) ||
+        (s.usuarioNombre && s.usuarioNombre.toLowerCase().includes(q))
+      )
+    }
+    return data
+  }, [suspensiones, filter, searchId])
 
   const columns = useMemo(() => {
     const col = createColumnHelper()
@@ -143,6 +156,7 @@ export function AdminUsuarios({ onNotice }) {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
     initialState: { pagination: { pageSize: 8 } },
   })
 
@@ -154,6 +168,28 @@ export function AdminUsuarios({ onNotice }) {
   function openLevantarModal() {
     setJustificacion('')
     setModal({ open: true, type: 'info', title: 'Levantar suspensión', confirm: true })
+  }
+
+  function openSuspensionModal() {
+    setSuspensionForm({ motivo: '', fechaFin: '' })
+    setSuspensionModal({ open: true })
+  }
+
+  async function confirmarSuspension() {
+    if (!selectedUser?.usuarioId || !suspensionForm.motivo.trim() || !suspensionForm.fechaFin) return
+    try {
+      await crearSuspension.mutateAsync({
+        idUsuario: selectedUser.usuarioId,
+        motivo: suspensionForm.motivo,
+        fechaFin: suspensionForm.fechaFin,
+      })
+      onNotice?.('success', 'Suspensión creada exitosamente')
+      setSuspensionModal({ open: false })
+      setDrawerOpen(false)
+      setSelectedUser(null)
+    } catch (err) {
+      onNotice?.('error', err?.response?.data?.error || 'Error al crear suspensión')
+    }
   }
 
   async function confirmarLevantar() {
@@ -200,6 +236,39 @@ export function AdminUsuarios({ onNotice }) {
         />
       </ActionModal>
 
+      <ActionModal
+        open={suspensionModal.open}
+        type="danger"
+        title="Crear suspensión manual"
+        lines={['Especifica la duración y motivo de la suspensión para este usuario.']}
+        onClose={() => setSuspensionModal({ open: false })}
+        onConfirm={confirmarSuspension}
+        confirmLabel="Crear suspensión"
+        cancelLabel="Cancelar"
+      >
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-600">Fecha de fin</label>
+            <input
+              type="date"
+              className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-50"
+              value={suspensionForm.fechaFin}
+              onChange={(e) => setSuspensionForm((p) => ({ ...p, fechaFin: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600">Motivo</label>
+            <textarea
+              className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-50"
+              rows={3}
+              placeholder="Motivo de la suspensión..."
+              value={suspensionForm.motivo}
+              onChange={(e) => setSuspensionForm((p) => ({ ...p, motivo: e.target.value }))}
+            />
+          </div>
+        </div>
+      </ActionModal>
+
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold text-slate-900">Gestión de Comunidad</h2>
@@ -223,7 +292,17 @@ export function AdminUsuarios({ onNotice }) {
           </div>
         </div>
         {tab === 'miembros' && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <div className="relative">
+              <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar por ID o nombre..."
+                value={searchId}
+                onChange={(e) => setSearchId(e.target.value)}
+                className="w-48 rounded-xl border border-slate-200 bg-white py-2 pl-8 pr-3 text-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary-50"
+              />
+            </div>
             {[
               { id: 'todos', label: 'Ver Todos' },
               { id: 'suspendidos', label: 'Suspendidos' },
@@ -391,6 +470,16 @@ export function AdminUsuarios({ onNotice }) {
                   >
                     <IconShieldAlert className="h-4 w-4" />
                     Levantar Suspensión Manual
+                  </button>
+                )}
+
+                {!selectedUser.activa && (
+                  <button
+                    onClick={openSuspensionModal}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-danger-500 py-3 text-sm font-semibold text-white transition hover:bg-danger-600"
+                  >
+                    <IconAlertTriangle className="h-4 w-4" />
+                    Crear Suspensión Manual
                   </button>
                 )}
               </div>

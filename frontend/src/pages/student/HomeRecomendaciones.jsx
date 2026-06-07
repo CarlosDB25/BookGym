@@ -70,6 +70,9 @@ export function HomeRecomendaciones({ onNotice }) {
   }, [reservasActivas])
 
   const perfil = recomendaciones?.perfilUsuario
+  const limiteActivas = recomendaciones?.limiteActivas ?? reglas?.limiteReservasActivas ?? 3
+  const totalActivas = recomendaciones?.totalActivas ?? reservasActivas.length
+  const alcanzadoLimite = totalActivas >= limiteActivas
 
   function pedirReserva(item) {
     setPendiente(item)
@@ -203,6 +206,11 @@ export function HomeRecomendaciones({ onNotice }) {
             <IconSparkles className="h-3.5 w-3.5 text-primary" />
             <h2 className="text-xs font-bold text-slate-900 dark:text-slate-100">Recomendados para ti</h2>
             <span className="text-[10px] text-slate-500">· {mejoresMomentos.length}</span>
+            {alcanzadoLimite && (
+              <span className="ml-auto rounded-full bg-warning-50 px-2 py-0.5 text-[9px] font-bold text-warning-600">
+                Límite alcanzado ({totalActivas}/{limiteActivas})
+              </span>
+            )}
           </div>
           <ul className="space-y-1.5">
             {mejoresMomentos.slice(0, 4).map((item) => (
@@ -225,10 +233,10 @@ export function HomeRecomendaciones({ onNotice }) {
                   </span>
                   <button
                     onClick={() => pedirReserva(item)}
-                    disabled={crearReserva.isPending || item.cuposRestantes <= 0}
+                    disabled={crearReserva.isPending || item.cuposRestantes <= 0 || alcanzadoLimite}
                     className="rounded-lg bg-primary px-2 py-1 text-[10px] font-bold text-white transition hover:bg-primary-700 disabled:opacity-40"
                   >
-                    {crearReserva.isPending ? '...' : 'Reservar'}
+                    {crearReserva.isPending ? '...' : alcanzadoLimite ? 'Límite' : 'Reservar'}
                   </button>
                 </div>
               </li>

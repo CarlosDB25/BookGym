@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import {
   PieChart, Pie, Cell,
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, CartesianGrid,
+  BarChart, Bar, CartesianGrid, Legend,
 } from 'recharts'
 import { useMetricasResumen, useMetricasAnalisis, useMetricasHeatmap } from '../../hooks/useMetricas'
 import { CardSkeleton } from '../../components/ui/SkeletonLoader'
@@ -13,29 +13,15 @@ const DONUT_COLORS = {
   completada: '#10b981',
   cancelada: '#f59e0b',
   no_show: '#f43f5e',
+  activa: '#6366f1',
 }
 
-function ocupacionColor(pct) {
+function heatBg(pct) {
   if (pct >= 80) return '#f43f5e'
   if (pct >= 60) return '#f59e0b'
-  if (pct >= 40) return '#3b82f6'
-  return '#10b981'
-}
-
-function heatColor(pct) {
-  if (pct >= 80) return 'bg-rose-500'
-  if (pct >= 60) return 'bg-amber-400'
-  if (pct >= 40) return 'bg-primary'
-  if (pct >= 20) return 'bg-emerald-400'
-  return 'bg-emerald-500/30'
-}
-
-function heatOpacity(pct) {
-  if (pct >= 80) return 'opacity-100'
-  if (pct >= 60) return 'opacity-85'
-  if (pct >= 40) return 'opacity-70'
-  if (pct >= 20) return 'opacity-55'
-  return 'opacity-25'
+  if (pct >= 40) return '#6366f1'
+  if (pct >= 20) return '#10b981'
+  return '#e2e8f0'
 }
 
 const TIPO_OPCIONES = [
@@ -111,7 +97,8 @@ export function DashboardAnalitico() {
   }
 
   const donutData = [
-    { name: 'Completadas', value: resumen?.totalReservadas || 0, key: 'completada' },
+    { name: 'Activas', value: resumen?.totalReservadas || 0, key: 'activa' },
+    { name: 'Completadas', value: resumen?.totalCompletadas || 0, key: 'completada' },
     { name: 'Canceladas', value: resumen?.totalCanceladas || 0, key: 'cancelada' },
     { name: 'No Show', value: resumen?.totalNoShow || 0, key: 'no_show' },
   ].filter((d) => d.value > 0)
@@ -165,7 +152,7 @@ export function DashboardAnalitico() {
 
       <div className="col-span-12 lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-slate-800">Saturación</h3>
+          <h3 className="text-sm font-semibold text-slate-800">Reservas por período</h3>
           <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
             {TIPO_OPCIONES.map(({ id, label }) => (
               <button
@@ -183,23 +170,18 @@ export function DashboardAnalitico() {
           </div>
         </div>
         {analisisData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={260}>
             <BarChart data={analisisData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="periodo" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-              <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" domain={[0, 100]} />
+              <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                formatter={(val) => [`${Number(val).toFixed(1)}%`, 'Ocupación']}
               />
-              <Bar dataKey="ocupacion" name="Ocupación %" radius={[6, 6, 0, 0]}>
-                {analisisData.map((entry, idx) => (
-                  <Cell
-                    key={idx}
-                    fill={ocupacionColor(entry.ocupacion || 0)}
-                  />
-                ))}
-              </Bar>
+              <Legend wrapperStyle={{ fontSize: '11px' }} />
+              <Bar dataKey="reservadas" name="Reservadas" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="completadas" name="Completadas" fill="#10b981" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="noShows" name="No Show" fill="#f43f5e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         ) : (
@@ -250,17 +232,17 @@ export function DashboardAnalitico() {
             <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-slate-400">
               <span>Bajo</span>
               <div className="flex gap-0.5">
-                <div className="h-3 w-3 rounded-sm bg-emerald-500/25" />
-                <div className="h-3 w-3 rounded-sm bg-emerald-500/55" />
-                <div className="h-3 w-3 rounded-sm bg-primary/70" />
-                <div className="h-3 w-3 rounded-sm bg-amber-400/85" />
-                <div className="h-3 w-3 rounded-sm bg-rose-500" />
+                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#e2e8f0' }} />
+                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#10b981' }} />
+                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#6366f1' }} />
+                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
+                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#f43f5e' }} />
               </div>
               <span>Alto</span>
             </div>
           </div>
           <div className="overflow-x-auto">
-            <div className="grid gap-1" style={{ gridTemplateColumns: `80px repeat(${heatmapHoras.length}, minmax(48px, 1fr))` }}>
+            <div className="grid gap-1" style={{ gridTemplateColumns: `80px repeat(${heatmapHoras.length}, minmax(56px, 1fr))` }}>
               <div className="text-[10px] font-semibold text-slate-400" />
               {heatmapHoras.map((h) => (
                 <div key={h} className="text-center text-[9px] font-mono font-bold text-slate-500">{h}</div>
@@ -274,16 +256,32 @@ export function DashboardAnalitico() {
                   {fila.slots.map((slot, si) => (
                     <div
                       key={si}
-                      className={`h-8 rounded-md ${slot.activa ? heatColor(slot.ocupacion) : 'bg-slate-100'} ${heatOpacity(slot.ocupacion)} flex items-center justify-center`}
-                      title={`${fila.dia} ${slot.hora}: ${slot.ocupacion}% ocupado`}
+                      className="relative h-10 rounded-md flex items-center justify-center transition"
+                      style={{
+                        backgroundColor: slot.activa ? heatBg(slot.ocupacion) : '#f1f5f9',
+                        border: slot.activa ? '1px solid rgba(0,0,0,0.08)' : '1px solid #e2e8f0',
+                      }}
+                      title={`${fila.dia} ${slot.hora}: ${slot.ocupacion}% ocupado${slot.activas ? ` (${slot.activas} activas)` : ''}`}
                     >
-                      <span className="text-[8px] font-bold text-white drop-shadow-sm">
-                        {slot.activa ? `${slot.ocupacion}%` : ''}
-                      </span>
+                      <div className="flex flex-col items-center leading-none">
+                        <span className="text-[8px] font-bold text-white drop-shadow-sm">
+                          {slot.activa ? `${slot.ocupacion}%` : ''}
+                        </span>
+                        {slot.activa && (slot.activas > 0 || slot.completadas > 0 || slot.noShows > 0) && (
+                          <span className="mt-0.5 text-[7px] font-medium text-white/80">
+                            {slot.activas}·{slot.completadas}·{slot.noShows}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </>
               ))}
+            </div>
+            <div className="mt-2 flex items-center gap-4 text-[9px] text-slate-500">
+              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-primary" /> Reservadas</span>
+              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-success-500" /> Completadas</span>
+              <span className="flex items-center gap-1"><span className="inline-block h-2 w-2 rounded-full bg-danger-500" /> No Show</span>
             </div>
           </div>
         </div>

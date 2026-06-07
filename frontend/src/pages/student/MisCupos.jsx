@@ -25,7 +25,6 @@ export function MisCupos({ onNotice }) {
   const cancelar = useCancelarReserva()
   const checkin = useCheckinReserva()
 
-  const windowCancel = (reglas?.anticipacionCancelacionMin || 30) * 60 * 1000
   const windowCheckin = reglas?.ventanaCheckinMin || 15
   const now = nowMillis()
 
@@ -42,7 +41,7 @@ export function MisCupos({ onNotice }) {
         now >= inicio - windowCheckin * 60 * 1000 && now <= fin
       return { ...r, inicio, fin, puedeCancelar, enVentanaCheckin }
     }).sort((a, b) => a.inicio - b.inicio)
-  }, [reservas, now, windowCancel, windowCheckin, reglas])
+  }, [reservas, now, windowCheckin, reglas])
 
   function solicitarCancelacion(reserva) {
     setPendiente(reserva)
