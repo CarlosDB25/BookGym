@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, createElement } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useReglasReserva } from '../../hooks/useReglasReserva'
 import { useActualizarReglas, usePlantillas, useActualizarPlantilla, useAuditLog } from '../../hooks/useAdmin'
@@ -362,7 +362,7 @@ function AuditTab() {
     <div className="space-y-3">
       {logs.map((log) => {
         let cambios = []
-        try { cambios = JSON.parse(log.detalle || '[]') } catch {}
+        try { cambios = JSON.parse(log.detalle || '[]') } catch { /* empty */ }
         return (
           <div key={log.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
             <div className="flex items-center justify-between text-sm">
@@ -402,12 +402,14 @@ export function AdminConfig({ onNotice }) {
   const actualizar = useActualizarReglas()
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (reglas) {
       setFormValues((prev) => {
         if (Object.keys(prev).length > 0) return prev
         return { ...reglas }
       })
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [reglas])
 
   function handleChange(key, value) {
@@ -473,17 +475,17 @@ export function AdminConfig({ onNotice }) {
   return (
     <div className="grid grid-cols-12 gap-8 p-6">
       <div className="col-span-4 space-y-1">
-        {TABS.map(({ id, label, icon: Icon }) => (
+        {TABS.map(({ id, label, icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
+            className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all ${
               tab === id
-                ? 'bg-primary text-white shadow-sm'
+                ? 'bg-primary text-white shadow-md'
                 : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            <Icon className="h-5 w-5" />
+            {createElement(icon, { className: 'h-5 w-5' })}
             {label}
           </button>
         ))}

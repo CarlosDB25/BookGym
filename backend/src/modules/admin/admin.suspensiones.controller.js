@@ -47,11 +47,13 @@ async function crear(req, res) {
         .json({ error: 'fechaFin debe ser posterior a fechaInicio' });
     }
 
+    const idAdmin = req.usuario?.id || 'admin';
     const suspension = await service.crearSuspension({
       idUsuario,
       fechaInicio,
       fechaFin,
       motivo,
+      creadoPor: idAdmin,
     });
     return res.status(201).json(suspension);
   } catch (error) {

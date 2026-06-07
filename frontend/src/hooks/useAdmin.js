@@ -75,6 +75,17 @@ export function usePlantillas() {
   })
 }
 
+export function useSuspensionHistorial() {
+  return useQuery({
+    queryKey: ['admin-suspension-historial'],
+    queryFn: async () => {
+      const { data } = await api.get('/admin/configuracion/audit-log?entidad=suspension')
+      return data
+    },
+    refetchInterval: 30000,
+  })
+}
+
 export function useActualizarPlantilla() {
   const queryClient = useQueryClient()
   return useMutation({

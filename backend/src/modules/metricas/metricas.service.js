@@ -270,7 +270,7 @@ async function recomendaciones(limite = 5, usuarioId = null) {
 
     if (stat) {
       const ocupacionHistorica = stat.capacidadHistorica > 0
-        ? stat.reservadasHistoricas / stat.capacidadHistorica
+        ? Math.min(1, stat.reservadasHistoricas / stat.capacidadHistorica)
         : 0;
       const ocupacionPct = Math.round(ocupacionHistorica * 100);
       const ocupacionPuntos = Math.round((1 - ocupacionHistorica) * 15);
@@ -371,20 +371,26 @@ async function recomendaciones(limite = 5, usuarioId = null) {
 
   const evitando = Object.values(slotStats)
     .map((s) => {
+      const ocupRaw = s.capacidadHistorica > 0
+        ? Math.min(1, s.reservadasHistoricas / s.capacidadHistorica)
+        : 0;
+      const ocupPct = Math.round(ocupRaw * 100);
       const libresPromedio = s.capacidad > 0
-        ? Math.max(0, s.capacidad - (s.reservadasHistoricas / Math.max(1, s.ocurrencias)))
+        ? Math.max(0, Math.round(s.capacidad - (s.reservadasHistoricas / Math.max(1, s.ocurrencias))))
         : 0;
       return {
         dia: s.dia,
         horaInicio: s.horaInicio,
-        ocupacionHistorica: Math.round((s.reservadasHistoricas / Math.max(1, s.capacidadHistorica)) * 100),
+        ocupacionHistorica: ocupPct,
         tasaAsistencia: s.totalReservas > 0 ? Math.round((s.completadas / s.totalReservas) * 100) : null,
-        razon: s.reservadasHistoricas / Math.max(1, s.capacidadHistorica) > 0.9
-          ? `Ocupación histórica del ${Math.round((s.reservadasHistoricas / Math.max(1, s.capacidadHistorica)) * 100)}% — casi siempre lleno`
-          : `Demanda alta y consistente: ${Math.round((s.reservadasHistoricas / Math.max(1, s.capacidadHistorica)) * 100)}% de ocupación`,
+        razon: ocupRaw > 0.9
+          ? `Ocupación del ${ocupPct}% — casi siempre lleno. ${libresPromedio} cupo(s) libre(s) en promedio`
+          : ocupPct >= 70
+          ? `Demanda alta: ${ocupPct}% de ocupación. ${libresPromedio} cupo(s) libre(s) en promedio`
+          : `Ocupación moderada: ${ocupPct}%. ${libresPromedio} cupo(s) libre(s) en promedio`,
       };
     })
-    .filter((s) => !slotKeysTop.has(`${s.dia}_${s.horaInicio}`))
+    .filter((s) => s.ocupacionHistorica >= 50)
     .sort((a, b) => b.ocupacionHistorica - a.ocupacionHistorica)
     .slice(0, 5);
 
@@ -490,12 +496,91 @@ async function resumen(fecha) {
   };
 }
 
+async function heatmap(tipo, fecha) {
+  const ahora = new Date();
+  let inicio, fin;
+  if (tipo === 'todo') {
+    inicio = new Date(ahora);
+    inicio.setFullYear(inicio.getFullYear() - 1);
+    fin = new Date(ahora);
+  } else if (tipo === 'dia') {
+    inicio = fecha ? new Date(`${fecha}T00:00:00`) : new Date();
+    inicio.setHours(0, 0, 0, 0);
+    fin = new Date(inicio);
+    fin.setDate(fin.getDate() + 1);
+  } else if (tipo === 'mes') {
+    const ref = fecha ? new Date(`${fecha}T00:00:00`) : ahora;
+    inicio = new Date(ref.getFullYear(), ref.getMonth(), 1);
+    fin = new Date(inicio.getFullYear(), inicio.getMonth() + 1, 1);
+  } else {
+    inicio = parseMonday(fecha);
+    fin = new Date(inicio);
+    fin.setDate(fin.getDate() + 5);
+  }
+
+  const franjas = await withTimeout(prisma.franja.findMany({
+    where: { fecha: { gte: inicio, lt: fin } },
+    include: {
+      plantilla: true,
+      reservas: { where: { estado: { not: 'cancelada' } }, select: { id: true } },
+    },
+    orderBy: [{ fecha: 'asc' }, { plantilla: { horaInicio: 'asc' } }],
+  }));
+
+  const slots = await prisma.plantillaFranja.findMany({
+    where: { activa: true },
+    orderBy: [{ diaSemana: 'asc' }, { horaInicio: 'asc' }],
+  });
+  const slotKeys = slots.map((s) => `${s.diaSemana}_${s.horaInicio}`);
+  const horasUnicas = [...new Set(slots.map((s) => s.horaInicio))].sort();
+
+  const mapa = {};
+  for (const f of franjas) {
+    const dia = f.plantilla.diaSemana;
+    const hora = f.plantilla.horaInicio;
+    const key = `${dia}_${hora}`;
+    if (!mapa[key]) mapa[key] = { dia, horaInicio: hora, totalCapacidad: 0, totalOcupadas: 0, ocurrencias: 0 };
+    mapa[key].totalCapacidad += f.plantilla.capacidadMaxima;
+    mapa[key].totalOcupadas += f.reservas.length;
+    mapa[key].ocurrencias += 1;
+  }
+
+  const filas = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes']
+    .filter((d) => slots.some((s) => s.diaSemana === d))
+    .map((dia) => ({
+      dia,
+      label: dia.charAt(0).toUpperCase() + dia.slice(1),
+      slots: horasUnicas.map((hora) => {
+        const key = `${dia}_${hora}`;
+        const data = mapa[key];
+        if (!data || data.ocurrencias === 0) {
+          return { hora, ocupacion: 0, ocurrencias: 0, activa: false };
+        }
+        const ocupacion = Math.round((data.totalOcupadas / Math.max(1, data.totalCapacidad)) * 100);
+        return {
+          hora,
+          ocupacion: Math.min(100, ocupacion),
+          ocurrencias: data.ocurrencias,
+          activa: true,
+        };
+      }),
+    }));
+
+  return { tipo, periodo: inicio.toISOString().slice(0, 10), filas, horas: horasUnicas };
+}
+
 async function analisis(tipo, fecha) {
   const ahora = new Date();
   const fechaRef = fecha ? new Date(`${fecha}T00:00:00`) : ahora;
 
   let inicio, fin, finAnterior;
-  if (tipo === 'dia') {
+  if (tipo === 'todo') {
+    inicio = new Date(ahora);
+    inicio.setFullYear(inicio.getFullYear() - 1);
+    fin = new Date(ahora);
+    finAnterior = new Date(inicio);
+    finAnterior.setFullYear(finAnterior.getFullYear() - 1);
+  } else if (tipo === 'dia') {
     inicio = new Date(fechaRef);
     inicio.setHours(0, 0, 0, 0);
     fin = new Date(inicio);
@@ -604,4 +689,4 @@ async function analisis(tipo, fecha) {
   };
 }
 
-module.exports = { resumen, recomendaciones, analisis };
+module.exports = { resumen, recomendaciones, analisis, heatmap };

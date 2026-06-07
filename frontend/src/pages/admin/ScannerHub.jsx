@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion } from 'framer-motion' // eslint-disable-line no-unused-vars
 import { Html5Qrcode } from 'html5-qrcode'
 import { Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import api from '../../config/axios'
@@ -158,15 +158,16 @@ export function ScannerHub({ onNotice }) {
       ;(async () => {
         try {
           if (instance) {
-            await instance.stop().catch(() => {})
-            await instance.clear().catch(() => {})
+            await instance.stop().catch(() => { /* empty */ })
+            await instance.clear().catch(() => { /* empty */ })
           }
-        } catch {}
+        } catch { /* empty */ }
         try {
           if (scannerDiv.parentNode === containerEl) containerEl.removeChild(scannerDiv)
-        } catch {}
+        } catch { /* empty */ }
       })()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanMode])
 
   return (

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion' // eslint-disable-line no-unused-vars
 import { IconX, IconAlertTriangle, IconCheck, IconInfo } from '../shared/Icons'
 
 const styles = {
@@ -25,11 +25,13 @@ export function Toast({ notice, onClose, duration = 4000 }) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!notice) {
       setVisible(false)
       return
     }
     setVisible(true)
+    /* eslint-enable react-hooks/set-state-in-effect */
     const timer = setTimeout(() => {
       setVisible(false)
       setTimeout(() => onClose?.(), 200)

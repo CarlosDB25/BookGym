@@ -12,53 +12,82 @@ Estructura del repositorio:
 
 - `backend/`: API, reglas de negocio, acceso a datos, scheduler
 - `frontend/`: interfaz de estudiante y administrador
-- `README.md`: visión integral y operación
-- `backend/README.md`: detalle técnico de API
-- `frontend/README.md`: detalle técnico de interfaz
+- `CONTEXT.md`: Arquitectura detallada para agentes de IA
+- `ESTADO_IMPLEMENTACION.md`: Matriz de cumplimiento y estado por modulo
 
-## 2) Reglas de negocio clave
+## 2) Funcionalidades principales
+
+### Estudiante
+- Inicio de sesión con credenciales institucionales
+- Exploración de franjas disponibles con cupos en tiempo real
+- Creación y cancelación de reservas
+- Check-in con ventana configurable
+- Recomendaciones personalizadas por horario
+- Perfil con estadísticas de uso, inasistencias y suspensiones
+- Soporte para modo oscuro
+
+### Administrador
+- Dashboard analítico con KPIs y tendencias
+- Mapa de calor de ocupación por día y franja
+- Análisis granular por día/semana/mes/todo
+- Gestión de suspensiones (crear, listar, levantar)
+- Configuración de reglas operativas (límites, ventanas, umbrales)
+- Gestión de plantillas de franja (activar/desactivar, editar)
+- Escáner QR/código de barras para check-in
+- Historial de cambios y auditoría
+
+### Automatización
+- Sincronización automática de franjas según plantillas
+- No-show detection y suspensiones automáticas en cascada
+- Scheduler cada 15 minutos
+
+## 3) Reglas de negocio clave
 
 Todas las reglas críticas están en backend y sus parámetros operativos viven en la tabla `configuracion` de la base de datos.
 
-Reglas activas:
+Claves de configuración:
+- `limite_reservas_activas` — Máximo de reservas activas simultáneas
+- `max_reservas_por_dia` — Máximo de reservas por día
+- `anticipacion_reserva_min` — Anticipación mínima para reservar (minutos)
+- `anticipacion_cancelacion_min` — Anticipación mínima para cancelar (minutos)
+- `umbral_noshow` — Inasistencias acumuladas que activan suspensión
+- `ventana_checkin_min` — Ventana de check-in (minutos antes/después)
+- `dias_suspension_por_noshow` — Días de suspensión automática
 
-- límite de reservas activas por usuario
-- máximo de reservas activas por día
-- anticipación mínima para reservar
-- anticipación mínima para cancelar
-- bloqueo por suspensión activa
-- control transaccional de cupos (sin sobreventa)
+## 4) API Endpoints
 
-Claves de configuración usadas:
+### Públicos
+- `GET /health` — Estado del servidor
+- `POST /api/auth/login` — Inicio de sesión
 
-- `limite_reservas_activas`
-- `max_reservas_por_dia`
-- `anticipacion_reserva_min`
-- `anticipacion_cancelacion_min`
+### Estudiante (requiere token)
+- `GET /api/franjas/semana?fecha=YYYY-MM-DD` — Disponibilidad semanal
+- `GET /api/reservas` — Reservas activas
+- `GET /api/reservas/historial` — Historial de reservas
+- `POST /api/reservas` — Crear reserva
+- `DELETE /api/reservas/:id` — Cancelar reserva
+- `POST /api/reservas/:id/check-in` — Check-in
+- `GET /api/metricas/recomendaciones?limite=5` — Recomendaciones personalizadas
+- `GET /api/configuracion/reglas-reserva` — Reglas operativas
 
-## 3) Flujo end-to-end
+### Admin (requiere token admin)
+- `GET /api/metricas/resumen?fecha=YYYY-MM-DD` — Panel semanal
+- `GET /api/metricas/analisis?tipo=semana|dia|mes|todo` — Análisis granular
+- `GET /api/metricas/heatmap?tipo=semana|dia|mes|todo` — Mapa de calor
+- `GET /api/admin/suspensiones` — Listar suspensiones
+- `POST /api/admin/suspensiones` — Crear suspensión manual
+- `DELETE /api/admin/suspensiones/:id` — Levantar suspensión
+- `GET /api/admin/suspensiones/usuarios` — Listar usuarios con estado
+- `PUT /api/admin/configuracion/reglas-reserva` — Actualizar reglas
+- `GET /api/admin/configuracion/audit-log?entidad=` — Historial de cambios
+- `GET /api/admin/plantillas` — Listar plantillas
+- `PUT /api/admin/plantillas/:id` — Editar plantilla
+- `GET /api/admin/scanner/verificar/:cedula` — Verificar estudiante
+- `POST /api/admin/scanner/checkin/:idReserva` — Check-in admin
 
-### Estudiante
-
-1. Inicia sesión (`/api/auth/login`).
-2. Consulta agenda semanal (`/api/franjas/semana`).
-3. Elige una franja y confirma en modal con condiciones de tiempo y cupo.
-4. Backend valida reglas y crea reserva de forma atómica.
-5. La reserva aparece en `Mis reservas activas`.
-6. Si se cancela dentro de ventana permitida, se libera cupo.
-7. Si la franja ya pasó o la reserva fue cancelada, se mueve a historial.
-
-### Administrador
-
-1. Inicia sesión con rol admin.
-2. Consulta métricas semanales (`/api/metricas/resumen`).
-3. Visualiza agenda en modo lectura (solo cupos y saturación).
-4. Métricas excluyen franjas no vigentes y reservas canceladas.
-
-## 4) Arranque local
+## 5) Arranque local
 
 Requisitos:
-
 - Node.js 20+
 - PostgreSQL
 
@@ -77,10 +106,10 @@ Requisitos:
 1. `cd frontend`
 2. `npm install`
 3. Copiar `.env.example` a `.env`
-4. Configurar `VITE_API_URL` (por ejemplo `http://localhost:3000/api`)
+4. Configurar `VITE_API_URL` (ej: `http://localhost:3000/api`)
 5. `npm run dev`
 
-Usuarios demo:
+### Usuarios demo
 
 | Usuario | Perfil | Password |
 |---------|--------|----------|
@@ -94,66 +123,38 @@ Usuarios demo:
 | `1103100844` | Dev — 1 historico + 1 activa semanal | `password123` |
 | `ADM001` | Administrador | `password123` |
 
-## 5) Swagger y ubicación exacta
-
-Swagger está alojado dentro del backend Express (no en servicio aparte).
-
-- Configuración OpenAPI: `backend/src/docs/swagger.js`
-- Montaje en app: `backend/src/app.js`
-- Anotaciones de rutas:
-  - `backend/src/modules/auth/auth.routes.js`
-  - `backend/src/modules/franjas/franjas.routes.js`
-  - `backend/src/modules/reservas/reservas.routes.js`
-  - `backend/src/modules/metricas/metricas.routes.js`
-  - `backend/src/modules/configuracion/configuracion.routes.js`
-  - `backend/src/modules/admin/admin.scanner.routes.js`
-
-Rutas:
+### Swagger
 
 - Local UI: `http://localhost:3000/api/docs`
 - Local JSON: `http://localhost:3000/api/docs.json`
-- Producción UI: `https://bookgym-production.up.railway.app/api/docs`
-- Producción JSON: `https://bookgym-production.up.railway.app/api/docs.json`
-
-## 5b) Scanner de ingreso (Admin)
-
-El endpoint `GET /api/admin/scanner/verificar/:cedula` permite al administrador escanear la cedula de un estudiante (via codigo de barras o ingreso manual) y conocer su estado operativo en tiempo real.
-
-**Respuestas posibles:**
-
-| Estado | Significado | Accion recomendada |
-|--------|------------|-------------------|
-| `SUSPENDIDO` | El estudiante tiene una suspension activa | Bloquear ingreso |
-| `RESERVA_ENCONTRADA` | Reserva activa dentro de ventana de check-in | Permitir ingreso |
-| `SIN_RESERVA` | No tiene reserva para la franja actual | Requiere ingreso manual/sobrecupo |
-
-- La ventana de check-in se lee desde `configuracion.ventana_checkin_min` (15 min antes/despues del inicio).
-- La hora actual se calcula en zona `America/Bogota` (UTC-5).
 
 ## 6) Despliegue Railway
 
 ### Backend (servicio API)
-
 - Root Directory: `backend`
 - Build: `npm install && npx prisma generate`
-- Start normal: `node src/server.js`
-
-Primera inicialización sin shell (si aplica):
-
-- Start temporal:
-`npx prisma migrate resolve --rolled-back 20260325043000_init && npx prisma migrate deploy && node prisma/seed.js && node src/server.js`
-
-Luego volver a start normal y redeploy.
+- Start: `node src/server.js`
 
 ### Frontend (servicio web)
-
 - Root Directory: `frontend`
 - Build: `npm install && npm run build`
 - Start: `npm run preview -- --host 0.0.0.0 --port $PORT`
 - Variable: `VITE_API_URL=https://bookgym-production.up.railway.app/api`
 
-## 7) Operación y diagnóstico rápido
+## 7) Tests
 
-- Salud backend: `GET /health`
-- Reglas activas en runtime: `GET /api/configuracion/reglas-reserva`
-- Si no se reflejan cambios en UI: verificar token, `VITE_API_URL`, y polling de React Query
+```bash
+cd backend
+npm test
+```
+
+Suite completa con 113+ tests: auth, franjas, reservas, asistencia, métricas, configuración, admin, integración, vulnerabilidades y concurrencia.
+
+## 8) Auditoría
+
+El sistema registra cambios en `audit_log` para:
+- Actualización de reglas operativas
+- Creación y levantamiento de suspensiones
+- Modificaciones de plantillas de franja
+
+Consulta: `GET /api/admin/configuracion/audit-log?entidad=configuracion|suspension|plantilla_franja`

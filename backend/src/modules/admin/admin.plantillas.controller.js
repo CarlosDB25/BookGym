@@ -13,7 +13,8 @@ async function actualizar(req, res) {
   try {
     const { id } = req.params;
     const { horaInicio, horaFin, capacidadMaxima, activa } = req.body;
-    const plantilla = await service.actualizarPlantilla(id, { horaInicio, horaFin, capacidadMaxima, activa });
+    const idAdmin = req.usuario?.id || 'admin';
+    const plantilla = await service.actualizarPlantilla(id, { horaInicio, horaFin, capacidadMaxima, activa }, idAdmin);
     return res.json(plantilla);
   } catch (error) {
     const status = error.status || 500;

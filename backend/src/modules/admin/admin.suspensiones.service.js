@@ -1,5 +1,15 @@
 const prisma = require('../../shared/prisma/client');
 
+async function registrarAuditoria(accion, entidad, idEntidad, detalle, idUsuario) {
+  try {
+    await prisma.auditLog.create({
+      data: { accion, entidad, idEntidad, detalle: JSON.stringify(detalle), idUsuario },
+    });
+  } catch (e) {
+    console.error('Error registrando auditoria:', e.message);
+  }
+}
+
 async function listarSuspensiones(activas) {
   const where = {};
   if (activas === 'true') {
@@ -27,7 +37,7 @@ async function listarSuspensiones(activas) {
     }));
 }
 
-async function crearSuspension({ idUsuario, fechaInicio, fechaFin, motivo }) {
+async function crearSuspension({ idUsuario, fechaInicio, fechaFin, motivo, creadoPor }) {
   const usuario = await prisma.usuario.findUnique({
     where: { idInstitucional: idUsuario },
   });
@@ -55,6 +65,10 @@ async function crearSuspension({ idUsuario, fechaInicio, fechaFin, motivo }) {
     },
     include: { usuario: { select: { idInstitucional: true } } },
   });
+
+  await registrarAuditoria('crear_suspension', 'suspension', suspension.id, {
+    idUsuario, motivo, fechaInicio, fechaFin,
+  }, creadoPor || 'admin');
 
   return {
     id: suspension.id,
@@ -84,6 +98,10 @@ async function levantarSuspension(id, idAdmin) {
     data: { activa: false, levantadaPor: idAdmin },
     include: { usuario: { select: { idInstitucional: true } } },
   });
+
+  await registrarAuditoria('levantar_suspension', 'suspension', actualizada.id, {
+    idUsuario: actualizada.idUsuario, levantadaPor: idAdmin,
+  }, idAdmin || 'admin');
 
    return {
      id: actualizada.id,

@@ -220,4 +220,38 @@ router.get('/resumen', controller.resumen);
  */
 router.get('/analisis', controller.analisis);
 
+/**
+ * @openapi
+ * /api/metricas/heatmap:
+ *   get:
+ *     tags:
+ *       - Metricas
+ *     summary: Mapa de calor de saturacion por dia y franja horaria
+ *     description: |
+ *       Retorna matriz de ocupacion historica para construir heatmap visual.
+ *       Agrupado por dia de la semana y franja horaria.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: tipo
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum: [dia, semana, mes, todo]
+ *           default: semana
+ *       - in: query
+ *         name: fecha
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: date
+ *     responses:
+ *       200:
+ *         description: Matriz de calor
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ */
+router.get('/heatmap', verificarToken, controller.heatmapEndpoint);
+
 module.exports = router;

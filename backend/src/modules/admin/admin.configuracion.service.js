@@ -109,9 +109,12 @@ async function actualizarReglas(datos, idAdmin) {
   };
 }
 
-async function obtenerAuditLog(limite = 100) {
+async function obtenerAuditLog(limite = 100, entidad = null) {
   try {
+    const where = {};
+    if (entidad) where.entidad = entidad;
     return await prisma.auditLog.findMany({
+      where,
       orderBy: { creadoEn: 'desc' },
       take: limite,
     });

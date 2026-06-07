@@ -1,6 +1,6 @@
 import { IconInbox } from '../shared/Icons'
 
-export function EmptyState({ icon: Icon = IconInbox, title, message, action }) {
+export function EmptyState({ icon: Icon = IconInbox, title, message, action }) { // eslint-disable-line no-unused-vars
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
       <Icon className="mb-3 h-10 w-10 text-slate-300" />

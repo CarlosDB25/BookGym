@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, createElement } from 'react'
 import { IconLayoutDashboard, IconScan, IconUsers, IconSettings, IconLogOut, IconSun, IconMoon } from '../components/shared/Icons'
 import { Logo } from '../components/shared/Logo'
 import { formatClock } from '../utils/time'
@@ -39,7 +39,7 @@ export function AdminDesktopLayout({ usuario, onLogout }) {
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {sidebarItems.map(({ path, label, icon: Icon }) => {
+          {sidebarItems.map(({ path, label, icon }) => {
             const isActive = location.pathname === path
             return (
               <NavLink
@@ -47,11 +47,11 @@ export function AdminDesktopLayout({ usuario, onLogout }) {
                 to={path}
                 className={`group flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
                   isActive
-                    ? 'bg-indigo-500/10 text-indigo-400'
-                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+                    ? 'bg-primary text-white shadow-md'
+                    : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
                 }`}
               >
-                <Icon className="h-5 w-5" />
+                {createElement(icon, { className: 'h-5 w-5' })}
                 <span>{label}</span>
                 {isActive && (
                   <span className="ml-auto h-5 w-1 rounded-full bg-indigo-400" />

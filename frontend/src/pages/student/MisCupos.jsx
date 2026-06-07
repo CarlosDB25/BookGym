@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, createElement } from 'react'
 import { useReservas, useHistorialReservas, useCancelarReserva, useCheckinReserva } from '../../hooks/useReservas'
 import { useReglasReserva } from '../../hooks/useReglasReserva'
 import { ActionModal } from '../../components/ui/ActionModal'
@@ -123,7 +123,7 @@ export function MisCupos({ onNotice }) {
       <h1 className="text-xl font-bold text-slate-900">Mis Cupos</h1>
 
       <div className="flex gap-2">
-        {tabs.map(({ id, label, icon: Icon, count }) => (
+        {tabs.map(({ id, label, icon, count }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
@@ -133,7 +133,7 @@ export function MisCupos({ onNotice }) {
                 : 'border border-slate-200 bg-white text-slate-600 hover:border-primary'
             }`}
           >
-            <Icon className="h-4 w-4" />
+            {createElement(icon, { className: 'h-4 w-4' })}
             {label}
             {count > 0 && (
               <span className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${

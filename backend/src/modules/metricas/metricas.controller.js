@@ -35,10 +35,10 @@ async function recomendaciones(req, res) {
 async function analisis(req, res) {
   try {
     const tipo = req.query.tipo || 'semana';
-    if (!['dia', 'semana', 'mes'].includes(tipo)) {
-      return res.status(400).json({ error: 'Tipo invalido. Use: dia, semana o mes' });
+    if (!['dia', 'semana', 'mes', 'todo'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo invalido. Use: dia, semana, mes o todo' });
     }
-    if (!validarFecha(req.query.fecha)) {
+    if (tipo !== 'todo' && !validarFecha(req.query.fecha)) {
       return res.status(400).json({ error: 'Formato de fecha invalido. Use YYYY-MM-DD' });
     }
     const data = await service.analisis(tipo, req.query.fecha);
@@ -53,4 +53,18 @@ async function analisis(req, res) {
   }
 }
 
-module.exports = { resumen, recomendaciones, analisis };
+async function heatmapEndpoint(req, res) {
+  try {
+    const tipo = req.query.tipo || 'semana';
+    if (!['dia', 'semana', 'mes', 'todo'].includes(tipo)) {
+      return res.status(400).json({ error: 'Tipo invalido. Use: dia, semana, mes o todo' });
+    }
+    const data = await service.heatmap(tipo, req.query.fecha);
+    return res.json(data);
+  } catch (error) {
+    console.error('Error en heatmap:', error.message);
+    return res.status(500).json({ error: 'No fue posible generar el heatmap' });
+  }
+}
+
+module.exports = { resumen, recomendaciones, analisis, heatmapEndpoint };

@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion } from 'framer-motion' // eslint-disable-line no-unused-vars
 import { Logo } from '../components/shared/Logo'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { IconSun, IconMoon } from '../components/shared/Icons'

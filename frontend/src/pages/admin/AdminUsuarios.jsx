@@ -7,12 +7,12 @@ import {
   flexRender,
   createColumnHelper,
 } from '@tanstack/react-table'
-import { useAdminSuspensiones, useLevantarSuspension } from '../../hooks/useAdmin'
+import { useAdminSuspensiones, useLevantarSuspension, useSuspensionHistorial } from '../../hooks/useAdmin'
 import { ActionModal } from '../../components/ui/ActionModal'
 import { CardSkeleton } from '../../components/ui/SkeletonLoader'
 import { EmptyState } from '../../components/ui/EmptyState'
-import { IconUsers, IconShieldAlert, IconAlertTriangle, IconChevronUp, IconChevronDown, IconChevronLeft, IconChevronRight, IconX, IconUserCheck, IconFileText } from '../../components/shared/Icons'
-import { motion, AnimatePresence } from 'framer-motion'
+import { IconUsers, IconShieldAlert, IconAlertTriangle, IconChevronUp, IconChevronDown, IconChevronLeft, IconChevronRight, IconX, IconUserCheck, IconFileText, IconHistory } from '../../components/shared/Icons'
+import { AnimatePresence } from 'framer-motion'
 
 const STATUS_BADGE = {
   suspendido: 'bg-danger-50 text-danger-700 border-danger-200',
@@ -20,7 +20,61 @@ const STATUS_BADGE = {
   activo: 'bg-success-50 text-success-700 border-success-200',
 }
 
+function SuspensionHistory() {
+  const { data: logs = [], isLoading } = useSuspensionHistorial()
+
+  if (isLoading) {
+    return <div className="space-y-2"><CardSkeleton /><CardSkeleton /><CardSkeleton /></div>
+  }
+
+  const susLogs = logs.filter((l) =>
+    ['crear_suspension', 'levantar_suspension'].includes(l.accion)
+  )
+
+  if (susLogs.length === 0) {
+    return (
+      <EmptyState
+        icon={IconHistory}
+        title="Sin actividad de suspensiones"
+        message="No se han registrado suspensiones o levantamientos manuales."
+      />
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {susLogs.map((log) => {
+        let detalle = {}
+        try { detalle = JSON.parse(log.detalle || '{}') } catch { /* empty */ }
+        const esCrear = log.accion === 'crear_suspension'
+        return (
+          <div key={log.id} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+            <div className="flex items-center justify-between text-sm">
+              <span className={`flex items-center gap-1.5 font-semibold ${esCrear ? 'text-danger-600' : 'text-success-600'}`}>
+                {esCrear ? <IconShieldAlert className="h-3.5 w-3.5" /> : <IconUserCheck className="h-3.5 w-3.5" />}
+                {esCrear ? 'Suspensión creada' : 'Suspensión levantada'}
+              </span>
+              <span className="text-xs text-slate-400">
+                {new Date(log.creadoEn).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">
+              Admin: {log.idUsuario} · Usuario: {detalle.idUsuario || '—'}
+            </p>
+            {detalle.motivo && (
+              <p className="mt-1 text-[11px] text-slate-600">
+                Motivo: {detalle.motivo}
+              </p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function AdminUsuarios({ onNotice }) {
+  const [tab, setTab] = useState('miembros')
   const [filter, setFilter] = useState('todos')
   const [selectedUser, setSelectedUser] = useState(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -146,33 +200,54 @@ export function AdminUsuarios({ onNotice }) {
         />
       </ActionModal>
 
-      <div className="mb-6 flex items-center justify-between">
-        <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold text-slate-900">Gestión de Comunidad</h2>
-          <p className="text-sm text-slate-500">{suspensiones.length} miembros</p>
-        </div>
-        <div className="flex gap-2">
-          {[
-            { id: 'todos', label: 'Ver Todos' },
-            { id: 'suspendidos', label: 'Solo Suspendidos' },
-            { id: 'riesgo', label: 'En Riesgo' },
-          ].map(({ id, label }) => (
+          <div className="flex gap-1 rounded-lg bg-slate-100 p-0.5">
             <button
-              key={id}
-              onClick={() => setFilter(id)}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                filter === id
-                  ? 'bg-primary text-white'
-                  : 'border border-slate-200 bg-white text-slate-600 hover:border-primary'
+              onClick={() => setTab('miembros')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                tab === 'miembros' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
               }`}
             >
-              {label}
+              Miembros
             </button>
-          ))}
+            <button
+              onClick={() => setTab('historial')}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                tab === 'historial' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'
+              }`}
+            >
+              Historial
+            </button>
+          </div>
         </div>
+        {tab === 'miembros' && (
+          <div className="flex gap-2">
+            {[
+              { id: 'todos', label: 'Ver Todos' },
+              { id: 'suspendidos', label: 'Suspendidos' },
+              { id: 'riesgo', label: 'En Riesgo' },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                onClick={() => setFilter(id)}
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                  filter === id
+                    ? 'bg-primary text-white'
+                    : 'border border-slate-200 bg-white text-slate-600 hover:border-primary'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {filteredData.length === 0 ? (
+      {tab === 'historial' && <SuspensionHistory />}
+
+      {tab === 'miembros' && (filteredData.length === 0 ? (
         <EmptyState
           icon={IconUsers}
           title="No se encontraron miembros"
@@ -242,7 +317,7 @@ export function AdminUsuarios({ onNotice }) {
             </div>
           </div>
         </div>
-      )}
+      ))}
 
       <AnimatePresence>
         {drawerOpen && selectedUser && (

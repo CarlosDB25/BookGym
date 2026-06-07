@@ -17,10 +17,25 @@ export function useMetricasAnalisis(tipo, fecha) {
   return useQuery({
     queryKey: ['metricas-analisis', tipo, fecha],
     queryFn: async () => {
-      const { data } = await api.get(`/metricas/analisis?tipo=${tipo}&fecha=${fecha}`)
+      const params = tipo === 'todo' ? `tipo=${tipo}` : `tipo=${tipo}&fecha=${fecha}`
+      const { data } = await api.get(`/metricas/analisis?${params}`)
       return data
     },
-    enabled: Boolean(tipo) && Boolean(fecha),
+    enabled: Boolean(tipo),
+    staleTime: 60000,
+    retry: 1,
+  })
+}
+
+export function useMetricasHeatmap(tipo, fecha) {
+  return useQuery({
+    queryKey: ['metricas-heatmap', tipo, fecha],
+    queryFn: async () => {
+      const params = tipo === 'todo' ? `tipo=${tipo}` : `tipo=${tipo}&fecha=${fecha}`
+      const { data } = await api.get(`/metricas/heatmap?${params}`)
+      return data
+    },
+    enabled: Boolean(tipo),
     staleTime: 60000,
     retry: 1,
   })

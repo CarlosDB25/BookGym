@@ -24,7 +24,8 @@ async function actualizarReglas(req, res) {
 
 async function obtenerAuditLog(req, res) {
   try {
-    const logs = await service.obtenerAuditLog();
+    const entidad = req.query.entidad || null;
+    const logs = await service.obtenerAuditLog(100, entidad);
     return res.json(logs);
   } catch (error) {
     return res.status(500).json({ error: 'No fue posible obtener el historial' });

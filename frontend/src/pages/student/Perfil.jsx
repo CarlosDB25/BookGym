@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useAuth } from '../../hooks/useAuth'
 import { useHistorialReservas, useReservas, useRecomendaciones } from '../../hooks/useReservas'
 import { useDarkMode } from '../../hooks/useDarkMode'
 import { SkeletonLoader } from '../../components/ui/SkeletonLoader'

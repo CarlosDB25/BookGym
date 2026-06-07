@@ -30,6 +30,13 @@ Thumbs.db
 # Archivos de referencia inicial
 doc2_guia_prototipo.docx
 secuencia-Reserva.png
+SECURITY_AND_TESTING_SUMMARY.md
 CONTEXT.md
 ESTADO_IMPLEMENTACION.md
-SECURITY_AND_TESTING_SUMMARY.md
+
+# Front base (referencias de diseno)
+frontend/Front base/
+frontend/scripts/
+frontend/front.md
+frontend/README front.md
+frontend/README back.md
