@@ -180,6 +180,7 @@ export function AdminUsuarios({ onNotice }) {
     try {
       await crearSuspension.mutateAsync({
         idUsuario: selectedUser.usuarioId,
+        fechaInicio: new Date().toISOString().slice(0, 10),
         motivo: suspensionForm.motivo,
         fechaFin: suspensionForm.fechaFin,
       })
@@ -402,7 +403,7 @@ export function AdminUsuarios({ onNotice }) {
         {drawerOpen && selectedUser && (
           <motion.div
             key="drawer-backdrop"
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+            className="fixed inset-0 z-40 bg-black/30 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

@@ -17,11 +17,16 @@ const DONUT_COLORS = {
 }
 
 function heatBg(pct) {
-  if (pct >= 80) return '#f43f5e'
-  if (pct >= 60) return '#f59e0b'
-  if (pct >= 40) return '#6366f1'
-  if (pct >= 20) return '#10b981'
-  return '#e2e8f0'
+  if (pct >= 80) return '#e11d48'
+  if (pct >= 60) return '#d97706'
+  if (pct >= 40) return '#4f46e5'
+  if (pct >= 20) return '#059669'
+  return '#cbd5e1'
+}
+
+function heatTextColor(pct) {
+  if (pct >= 40) return '#ffffff'
+  return '#1e293b'
 }
 
 const TIPO_OPCIONES = [
@@ -264,11 +269,19 @@ export function DashboardAnalitico() {
                       title={`${fila.dia} ${slot.hora}: ${slot.ocupacion}% ocupado${slot.activas ? ` (${slot.activas} activas)` : ''}`}
                     >
                       <div className="flex flex-col items-center leading-none">
-                        <span className="text-[8px] font-bold text-white drop-shadow-sm">
-                          {slot.activa ? `${slot.ocupacion}%` : ''}
-                        </span>
+                        {slot.activa && (
+                          <span
+                            className="text-[8px] font-bold"
+                            style={{ color: heatTextColor(slot.ocupacion) }}
+                          >
+                            {slot.ocupacion}%
+                          </span>
+                        )}
                         {slot.activa && (slot.activas > 0 || slot.completadas > 0 || slot.noShows > 0) && (
-                          <span className="mt-0.5 text-[7px] font-medium text-white/80">
+                          <span
+                            className="mt-0.5 text-[7px] font-medium"
+                            style={{ color: heatTextColor(slot.ocupacion), opacity: 0.8 }}
+                          >
                             {slot.activas}·{slot.completadas}·{slot.noShows}
                           </span>
                         )}

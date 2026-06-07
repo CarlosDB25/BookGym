@@ -447,14 +447,11 @@ async function recomendaciones(limite = 5, usuarioId = null) {
 }
 
 async function resumen(fecha) {
-  const minutosAnticipacionReserva = await leerConfigConDefault(
-    'anticipacion_reserva_min',
-    30,
-    'Minutos minimos de anticipacion para crear reserva'
-  );
   const inicio = parseMonday(fecha);
-  const fin = new Date(inicio);
-  fin.setDate(inicio.getDate() + 5);
+  const finRaw = new Date(inicio);
+  finRaw.setDate(inicio.getDate() + 5);
+  const ahora = new Date();
+  const fin = finRaw > ahora ? ahora : finRaw;
   const inicioAnterior = new Date(inicio);
   inicioAnterior.setDate(inicioAnterior.getDate() - 7);
   const finAnterior = new Date(inicioAnterior);
@@ -470,14 +467,6 @@ async function resumen(fecha) {
       include: { plantilla: true, reservas: { select: { estado: true } } },
     }),
   ]));
-
-   const ahora = new Date();
-   function filtrarVigentes(lista, refAhora = ahora) {
-     return lista.filter(f => {
-       const inicioF = inicioFranjaBogota(f.fecha, f.plantilla.horaInicio);
-       return refAhora < new Date(inicioF.getTime() - minutosAnticipacionReserva * 60000);
-     });
-   }
 
   function calcularMetricas(listaFranjas) {
     const capacidad = listaFranjas.reduce((acc, f) => acc + f.plantilla.capacidadMaxima, 0);
@@ -501,12 +490,8 @@ async function resumen(fecha) {
     return { capacidad, disponibles, reservadas, canceladas, noShows, ocupacion, tasaNoShow, alta, media, baja, total: listaFranjas.length, pico, valle };
   }
 
-  const vigentes = filtrarVigentes(franjas);
-  const ahoraSemanaAnterior = new Date(ahora);
-  ahoraSemanaAnterior.setDate(ahoraSemanaAnterior.getDate() - 7);
-  const vigentesAnteriores = filtrarVigentes(franjasAnteriores, ahoraSemanaAnterior);
-  const actual = calcularMetricas(vigentes);
-  const anterior = calcularMetricas(vigentesAnteriores);
+  const actual = calcularMetricas(franjas);
+  const anterior = calcularMetricas(franjasAnteriores);
   const diffOcupacion = actual.ocupacion - anterior.ocupacion;
   const tendenciaOcupacion = diffOcupacion > 5 ? 'subiendo' : diffOcupacion < -5 ? 'bajando' : 'estable';
   const cambioOcupacion = anterior.ocupacion > 0 ? `${diffOcupacion > 0 ? '+' : ''}${diffOcupacion}%` : 'sin dato previo';
@@ -634,13 +619,19 @@ async function analisis(tipo, fecha) {
     inicio = parseMonday(fecha);
     fin = new Date(inicio);
     fin.setDate(fin.getDate() + 5);
+    if (fin > ahora) fin = new Date(ahora);
     finAnterior = new Date(inicio);
     finAnterior.setDate(finAnterior.getDate() - 7);
   }
 
   const inicioAnterior = new Date(finAnterior);
-  const finAnteriorCalc = new Date(tipo === 'semana' ? inicioAnterior : inicio);
-  if (tipo === 'semana') finAnteriorCalc.setDate(finAnteriorCalc.getDate() + 5);
+  const finAnteriorCalc = new Date(inicioAnterior);
+  if (tipo === 'semana') {
+    const diasTranscurridos = Math.round((fin - inicio) / (1000 * 60 * 60 * 24));
+    finAnteriorCalc.setDate(finAnteriorCalc.getDate() + diasTranscurridos);
+  } else {
+    finAnteriorCalc.setTime(inicio.getTime());
+  }
   const [franjas, franjasAnteriores] = await withTimeout(Promise.all([
     prisma.franja.findMany({
       where: { fecha: { gte: inicio, lt: fin } },
