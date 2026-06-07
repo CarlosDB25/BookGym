@@ -16,7 +16,13 @@ const DONUT_COLORS = {
   activa: '#6366f1',
 }
 
-function heatBg(pct) {
+function heatBg(pct, modo) {
+  if (modo === 'no_shows') {
+    if (pct >= 30) return '#e11d48'
+    if (pct >= 15) return '#d97706'
+    if (pct >= 5) return '#f59e0b'
+    return '#d1fae5'
+  }
   if (pct >= 80) return '#e11d48'
   if (pct >= 60) return '#d97706'
   if (pct >= 40) return '#4f46e5'
@@ -24,9 +30,11 @@ function heatBg(pct) {
   return '#cbd5e1'
 }
 
-function heatTextColor(pct) {
-  if (pct >= 40) return '#ffffff'
-  return '#1e293b'
+function heatTextColor(pct, modo) {
+  if (modo === 'no_shows') {
+    return pct >= 15 ? '#ffffff' : '#1e293b'
+  }
+  return pct >= 40 ? '#ffffff' : '#1e293b'
 }
 
 const TIPO_OPCIONES = [
@@ -34,6 +42,13 @@ const TIPO_OPCIONES = [
   { id: 'dia', label: 'Diario' },
   { id: 'mes', label: 'Mensual' },
   { id: 'todo', label: 'Siempre' },
+]
+
+const MODO_OPCIONES = [
+  { id: 'ocupacion', label: 'Ocupación' },
+  { id: 'activas', label: 'Activas' },
+  { id: 'completadas', label: 'Completadas' },
+  { id: 'no_shows', label: 'No-Shows' },
 ]
 
 function MiniSparkline({ values, color = '#4f46e5' }) {
@@ -84,9 +99,10 @@ function KpiCard({ icon, label, value, trend, trendLabel, sparkData }) {
 export function DashboardAnalitico() {
   const fecha = useMemo(() => mondayFromYMD(todayYMD()), [])
   const [tipoAnalisis, setTipoAnalisis] = useState('semana')
+  const [modoHeatmap, setModoHeatmap] = useState('ocupacion')
   const { data: resumen, isLoading } = useMetricasResumen(fecha)
   const { data: analisis } = useMetricasAnalisis(tipoAnalisis, fecha)
-  const { data: heatmapData } = useMetricasHeatmap(tipoAnalisis, fecha)
+  const { data: heatmapData } = useMetricasHeatmap(tipoAnalisis, fecha, modoHeatmap)
 
   if (isLoading) {
     return (
@@ -116,25 +132,27 @@ export function DashboardAnalitico() {
   const heatmapFilas = heatmapData?.filas || []
   const heatmapHoras = heatmapData?.horas || []
 
+  const noShowLabel = modoHeatmap === 'no_shows' ? '% Inasistencia' : modoHeatmap === 'activas' ? '% Activas' : modoHeatmap === 'completadas' ? '% Completadas' : '% Ocupación'
+
   return (
     <div className="grid grid-cols-12 gap-4 p-4">
       <div className="col-span-12 sm:col-span-6 lg:col-span-3">
         <KpiCard
           icon={IconActivity}
           label="Ocupación"
-          value={`${Number(ocupacion).toFixed(1)}%`}
+          value={`${Number(ocupacion).toFixed(0)}%`}
           trend={resumen?.cambioOcupacion}
-          trendLabel="vs ant."
+          trendLabel="vs sem ant."
           sparkData={sparkData}
         />
       </div>
       <div className="col-span-12 sm:col-span-6 lg:col-span-3">
         <KpiCard
           icon={IconX}
-          label="Tasa No-Show"
-          value={`${Number(tasaNoShow).toFixed(1)}%`}
+          label="No-Show"
+          value={`${Number(tasaNoShow).toFixed(0)}%`}
           trend={resumen?.cambioNoShow}
-          trendLabel="vs ant."
+          trendLabel="vs sem ant."
           sparkData={sparkData}
         />
       </div>
@@ -149,8 +167,8 @@ export function DashboardAnalitico() {
       <div className="col-span-12 sm:col-span-6 lg:col-span-3">
         <KpiCard
           icon={IconTrendingUp}
-          label="Capacidad Total"
-          value={resumen?.totalCapacidad || 0}
+          label="Franjas"
+          value={resumen?.totalFranjas || 0}
           sparkData={sparkData}
         />
       </div>
@@ -232,16 +250,33 @@ export function DashboardAnalitico() {
 
       {heatmapFilas.length > 0 && (
         <div className="col-span-12 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-slate-800">Mapa de Calor</h3>
-            <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-slate-400">
+            <div className="flex gap-1 rounded-lg bg-slate-100 p-1">
+              {MODO_OPCIONES.map(({ id, label }) => (
+                <button
+                  key={id}
+                  onClick={() => setModoHeatmap(id)}
+                  className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                    modoHeatmap === id
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mb-2 flex items-center gap-2 text-[10px] text-slate-400">
+            <span className="font-semibold uppercase">{noShowLabel}</span>
+            <span>·</span>
+            <div className="flex items-center gap-1">
               <span>Bajo</span>
               <div className="flex gap-0.5">
-                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#e2e8f0' }} />
-                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#10b981' }} />
-                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#6366f1' }} />
-                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#f59e0b' }} />
-                <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: '#f43f5e' }} />
+                {[20, 40, 60, 80].map((p) => (
+                  <div key={p} className="h-3 w-3 rounded-sm" style={{ backgroundColor: heatBg(p, modoHeatmap) }} />
+                ))}
               </div>
               <span>Alto</span>
             </div>
@@ -263,24 +298,24 @@ export function DashboardAnalitico() {
                       key={si}
                       className="relative h-10 rounded-md flex items-center justify-center transition"
                       style={{
-                        backgroundColor: slot.activa ? heatBg(slot.ocupacion) : '#f1f5f9',
+                        backgroundColor: slot.activa ? heatBg(slot.valor, modoHeatmap) : '#f1f5f9',
                         border: slot.activa ? '1px solid rgba(0,0,0,0.08)' : '1px solid #e2e8f0',
                       }}
-                      title={`${fila.dia} ${slot.hora}: ${slot.ocupacion}% ocupado${slot.activas ? ` (${slot.activas} activas)` : ''}`}
+                      title={`${fila.dia} ${slot.hora}: ${slot.valor}%${modoHeatmap === 'no_shows' ? ' inasistencia' : modoHeatmap === 'activas' ? ' activas' : modoHeatmap === 'completadas' ? ' completadas' : ' ocupado'}${slot.activas ? ` (${slot.activas} activas)` : ''}`}
                     >
                       <div className="flex flex-col items-center leading-none">
                         {slot.activa && (
                           <span
                             className="text-[8px] font-bold"
-                            style={{ color: heatTextColor(slot.ocupacion) }}
+                            style={{ color: heatTextColor(slot.valor, modoHeatmap) }}
                           >
-                            {slot.ocupacion}%
+                            {slot.valor}%
                           </span>
                         )}
                         {slot.activa && (slot.activas > 0 || slot.completadas > 0 || slot.noShows > 0) && (
                           <span
                             className="mt-0.5 text-[7px] font-medium"
-                            style={{ color: heatTextColor(slot.ocupacion), opacity: 0.8 }}
+                            style={{ color: heatTextColor(slot.valor, modoHeatmap), opacity: 0.8 }}
                           >
                             {slot.activas}·{slot.completadas}·{slot.noShows}
                           </span>
@@ -316,7 +351,7 @@ export function DashboardAnalitico() {
               <YAxis tick={{ fontSize: 11 }} stroke="#94a3b8" domain={[0, 100]} />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                formatter={(val) => [`${Number(val).toFixed(1)}%`, 'Ocupación']}
+                formatter={(val) => [`${val}%`, 'Ocupación']}
               />
               <Area
                 type="monotone"

@@ -27,12 +27,15 @@ export function useMetricasAnalisis(tipo, fecha) {
   })
 }
 
-export function useMetricasHeatmap(tipo, fecha) {
+export function useMetricasHeatmap(tipo, fecha, modo = 'ocupacion') {
   return useQuery({
-    queryKey: ['metricas-heatmap', tipo, fecha],
+    queryKey: ['metricas-heatmap', tipo, fecha, modo],
     queryFn: async () => {
-      const params = tipo === 'todo' ? `tipo=${tipo}` : `tipo=${tipo}&fecha=${fecha}`
-      const { data } = await api.get(`/metricas/heatmap?${params}`)
+      const params = new URLSearchParams()
+      params.set('tipo', tipo)
+      if (tipo !== 'todo') params.set('fecha', fecha)
+      params.set('modo', modo)
+      const { data } = await api.get(`/metricas/heatmap?${params.toString()}`)
       return data
     },
     enabled: Boolean(tipo),

@@ -19,8 +19,21 @@ export function useCrearSuspension() {
       const { data } = await api.post('/admin/suspensiones', payload)
       return data
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['admin-suspensiones'] })
+      queryClient.setQueryData(['admin-suspensiones'], (old) => {
+        if (!old) return old
+        return old.map((u) => {
+          if (u.usuarioId === data.idUsuario) {
+            return {
+              ...u,
+              activa: true,
+              suspension: { id: data.id, fechaInicio: data.fechaInicio, fechaFin: data.fechaFin, motivo: data.motivo },
+            }
+          }
+          return u
+        })
+      })
     },
   })
 }

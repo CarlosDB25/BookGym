@@ -448,14 +448,15 @@ async function recomendaciones(limite = 5, usuarioId = null) {
 
 async function resumen(fecha) {
   const inicio = parseMonday(fecha);
+  const ahora = new Date();
   const finRaw = new Date(inicio);
   finRaw.setDate(inicio.getDate() + 5);
-  const ahora = new Date();
-  const fin = finRaw > ahora ? ahora : finRaw;
+  const fin = finRaw > ahora ? new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1) : finRaw;
   const inicioAnterior = new Date(inicio);
   inicioAnterior.setDate(inicioAnterior.getDate() - 7);
   const finAnterior = new Date(inicioAnterior);
-  finAnterior.setDate(inicioAnterior.getDate() + 5);
+  const diasTranscurridos = Math.round((fin - inicio) / (1000 * 60 * 60 * 24));
+  finAnterior.setDate(inicioAnterior.getDate() + diasTranscurridos);
 
   const [franjas, franjasAnteriores] = await withTimeout(Promise.all([
     prisma.franja.findMany({
@@ -471,23 +472,25 @@ async function resumen(fecha) {
   function calcularMetricas(listaFranjas) {
     const capacidad = listaFranjas.reduce((acc, f) => acc + f.plantilla.capacidadMaxima, 0);
     const disponibles = listaFranjas.reduce((acc, f) => acc + f.cuposDisponibles, 0);
-    let reservadas = 0, canceladas = 0, noShows = 0;
+    let reservadas = 0, completadas = 0, canceladas = 0, noShows = 0;
     for (const f of listaFranjas) {
       for (const r of f.reservas) {
         if (r.estado === 'activa') reservadas++;
+        else if (r.estado === 'completada') completadas++;
         else if (r.estado === 'no_show') noShows++;
         else if (r.estado === 'cancelada') canceladas++;
       }
     }
+    const ocupadas = reservadas + completadas;
     const alta = listaFranjas.filter(f => calcOcupacion(f.cuposDisponibles, f.plantilla.capacidadMaxima) >= 75).length;
     const media = listaFranjas.filter(f => { const o = calcOcupacion(f.cuposDisponibles, f.plantilla.capacidadMaxima); return o >= 40 && o < 75; }).length;
     const baja = listaFranjas.length - alta - media;
-    const ocupacion = capacidad > 0 ? Math.round((reservadas / capacidad) * 100) : 0;
-    const tasaNoShow = reservadas + noShows > 0 ? Math.round((noShows / (reservadas + noShows)) * 100) : 0;
+    const ocupacion = capacidad > 0 ? Math.round((ocupadas / capacidad) * 100) : 0;
+    const tasaNoShow = ocupadas + noShows > 0 ? Math.round((noShows / (ocupadas + noShows)) * 100) : 0;
     const horas = listaFranjas.map(f => ({ dia: f.plantilla.diaSemana, horaInicio: f.plantilla.horaInicio, saturacion: calcOcupacion(f.cuposDisponibles, f.plantilla.capacidadMaxima) }));
     const pico = horas.filter(h => h.saturacion >= 75).sort((a, b) => b.saturacion - a.saturacion).slice(0, 3);
     const valle = horas.filter(h => h.saturacion < 25).sort((a, b) => a.saturacion - b.saturacion).slice(0, 3);
-    return { capacidad, disponibles, reservadas, canceladas, noShows, ocupacion, tasaNoShow, alta, media, baja, total: listaFranjas.length, pico, valle };
+    return { capacidad, disponibles, reservadas, completadas, canceladas, noShows, ocupacion, tasaNoShow, alta, media, baja, total: listaFranjas.length, pico, valle };
   }
 
   const actual = calcularMetricas(franjas);
@@ -502,7 +505,7 @@ async function resumen(fecha) {
   return {
     semana: inicio.toISOString().slice(0, 10), totalCapacidad: actual.capacidad,
     totalDisponibles: actual.disponibles, totalReservadas: actual.reservadas,
-    totalCanceladas: actual.canceladas, totalNoShow: actual.noShows,
+    totalCompletadas: actual.completadas, totalCanceladas: actual.canceladas, totalNoShow: actual.noShows,
     ocupacionPromedio: actual.ocupacion, tendenciaOcupacion, cambioVsSemanaAnterior: cambioOcupacion,
     cambioOcupacion: diffOcupacion, cambioNoShow: diffNoShow,
     saturacionAlta: actual.alta, saturacionMedia: actual.media, saturacionBaja: actual.baja,
@@ -511,7 +514,7 @@ async function resumen(fecha) {
   };
 }
 
-async function heatmap(tipo, fecha) {
+async function heatmap(tipo, fecha, modo = 'ocupacion') {
   const ahora = new Date();
   let inicio, fin;
   if (tipo === 'todo') {
@@ -531,6 +534,7 @@ async function heatmap(tipo, fecha) {
     inicio = parseMonday(fecha);
     fin = new Date(inicio);
     fin.setDate(fin.getDate() + 5);
+    if (fin > ahora) fin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1);
   }
 
   const franjas = await withTimeout(prisma.franja.findMany({
@@ -574,12 +578,22 @@ async function heatmap(tipo, fecha) {
         const key = `${dia}_${hora}`;
         const data = mapa[key];
         if (!data || data.ocurrencias === 0) {
-          return { hora, ocupacion: 0, activas: 0, completadas: 0, noShows: 0, ocurrencias: 0, activa: false };
+          return { hora, valor: 0, activas: 0, completadas: 0, noShows: 0, ocurrencias: 0, activa: false };
         }
-        const ocupacion = Math.round((data.totalOcupadas / Math.max(1, data.totalCapacidad)) * 100);
+        let valor;
+        if (modo === 'activas') {
+          valor = data.totalCapacidad > 0 ? Math.round((data.activas / data.totalCapacidad) * 100) : 0;
+        } else if (modo === 'completadas') {
+          valor = data.totalCapacidad > 0 ? Math.round((data.completadas / data.totalCapacidad) * 100) : 0;
+        } else if (modo === 'no_shows') {
+          const totalReservas = data.activas + data.completadas + data.noShows;
+          valor = totalReservas > 0 ? Math.round((data.noShows / totalReservas) * 100) : 0;
+        } else {
+          valor = data.totalCapacidad > 0 ? Math.round(((data.activas + data.completadas) / data.totalCapacidad) * 100) : 0;
+        }
         return {
           hora,
-          ocupacion: Math.min(100, ocupacion),
+          valor: Math.min(100, valor),
           activas: data.activas,
           completadas: data.completadas,
           noShows: data.noShows,
@@ -589,7 +603,7 @@ async function heatmap(tipo, fecha) {
       }),
     }));
 
-  return { tipo, periodo: inicio.toISOString().slice(0, 10), filas, horas: horasUnicas };
+  return { tipo, modo, periodo: inicio.toISOString().slice(0, 10), filas, horas: horasUnicas };
 }
 
 async function analisis(tipo, fecha) {
@@ -619,7 +633,7 @@ async function analisis(tipo, fecha) {
     inicio = parseMonday(fecha);
     fin = new Date(inicio);
     fin.setDate(fin.getDate() + 5);
-    if (fin > ahora) fin = new Date(ahora);
+    if (fin > ahora) fin = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() + 1);
     finAnterior = new Date(inicio);
     finAnterior.setDate(finAnterior.getDate() - 7);
   }
@@ -646,13 +660,14 @@ async function analisis(tipo, fecha) {
   ]));
 
   function procesarGrupo(lista) {
-    let totalCapacidad = 0, totalDisponibles = 0, reservadas = 0, noShows = 0;
+    let totalCapacidad = 0, totalDisponibles = 0, reservadas = 0, completadas = 0, noShows = 0;
     const horas = {};
     for (const f of lista) {
       totalCapacidad += f.plantilla.capacidadMaxima;
       totalDisponibles += f.cuposDisponibles;
       for (const r of f.reservas) {
         if (r.estado === 'activa') reservadas++;
+        else if (r.estado === 'completada') completadas++;
         else if (r.estado === 'no_show') noShows++;
       }
       const key = `${f.plantilla.diaSemana}_${f.plantilla.horaInicio}`;
@@ -660,13 +675,14 @@ async function analisis(tipo, fecha) {
       horas[key].total += calcOcupacion(f.cuposDisponibles, f.plantilla.capacidadMaxima) / 100;
       horas[key].count += 1;
     }
-    const ocupacion = totalCapacidad > 0 ? Math.round((reservadas / totalCapacidad) * 100) : 0;
-    const tasaNoShow = reservadas + noShows > 0 ? Math.round((noShows / (reservadas + noShows)) * 100) : 0;
+    const ocupadas = reservadas + completadas;
+    const ocupacion = totalCapacidad > 0 ? Math.round((ocupadas / totalCapacidad) * 100) : 0;
+    const tasaNoShow = ocupadas + noShows > 0 ? Math.round((noShows / (ocupadas + noShows)) * 100) : 0;
     const pico = Object.values(horas).map(h => ({ dia: h.dia, horaInicio: h.horaInicio, saturacion: Math.round((h.total / h.count) * 100) }))
       .filter(h => h.saturacion >= 75).sort((a, b) => b.saturacion - a.saturacion).slice(0, 5);
     const valle = Object.values(horas).map(h => ({ dia: h.dia, horaInicio: h.horaInicio, saturacion: Math.round((h.total / h.count) * 100) }))
       .filter(h => h.saturacion < 25).sort((a, b) => a.saturacion - b.saturacion).slice(0, 5);
-    return { capacidad: totalCapacidad, disponibles: totalDisponibles, reservadas, noShows, ocupacion, tasaNoShow, pico, valle };
+    return { capacidad: totalCapacidad, disponibles: totalDisponibles, reservadas, completadas, noShows, ocupacion, tasaNoShow, pico, valle };
   }
 
   const actual = procesarGrupo(franjas);

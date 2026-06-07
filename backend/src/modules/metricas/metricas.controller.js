@@ -59,7 +59,11 @@ async function heatmapEndpoint(req, res) {
     if (!['dia', 'semana', 'mes', 'todo'].includes(tipo)) {
       return res.status(400).json({ error: 'Tipo invalido. Use: dia, semana, mes o todo' });
     }
-    const data = await service.heatmap(tipo, req.query.fecha);
+    const modo = req.query.modo || 'ocupacion';
+    if (!['ocupacion', 'activas', 'completadas', 'no_shows'].includes(modo)) {
+      return res.status(400).json({ error: 'Modo invalido. Use: ocupacion, activas, completadas, no_shows' });
+    }
+    const data = await service.heatmap(tipo, req.query.fecha, modo);
     return res.json(data);
   } catch (error) {
     console.error('Error en heatmap:', error.message);
