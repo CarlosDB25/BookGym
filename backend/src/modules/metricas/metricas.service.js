@@ -344,28 +344,49 @@ async function recomendaciones(limite = 5, usuarioId = null) {
       };
     });
 
-  const mejoresMomentos = franjasEvaluadas
+  const activeSlotKeys = new Set(
+    (reservasUsuario || [])
+      .filter((r) => r.estado === 'activa')
+      .map((r) => `${r.franja?.fecha?.toISOString?.()?.slice(0, 10) || r.fecha}__${r.franja?.plantilla?.horaInicio}`)
+  );
+
+  const candidatas = franjasEvaluadas
     .filter((f) => f.cuposRestantes > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limite)
-    .map((f) => {
-      const razonPrincipal = f.razones[0] || `${f.cuposRestantes} cupos disponibles`;
-      return {
-        id: f.id,
-        fecha: f.fecha,
-        dia: f.dia,
-        horaInicio: f.horaInicio,
-        horaFin: f.horaFin,
-        cuposRestantes: f.cuposRestantes,
-        capacidadMaxima: f.capacidadMaxima,
-        afinidad: f.afinidad,
-        score: f.score,
-        ocupacionHistorica: f.ocupacionHistorica,
-        razon: razonPrincipal,
-        todasRazones: f.razones,
-        penalizaciones: f.penalizaciones,
-      };
+    .filter((f) => !activeSlotKeys.has(`${f.fecha}__${f.horaInicio}`));
+
+  const maxPorDia = await leerConfigConDefault('max_reservas_por_dia', 1, 'Maximo de reservas por dia');
+
+  const byKey = new Map();
+  for (const c of candidatas) {
+    const k = `${c.dia}_${c.horaInicio}`;
+    if (!byKey.has(k) || c.score > byKey.get(k).score) byKey.set(k, c);
+  }
+  const deduped = [...byKey.values()].sort((a, b) => b.score - a.score);
+
+  const usedDays = {};
+  const mejoresMomentos = [];
+  for (const c of deduped) {
+    const dayCount = usedDays[c.fecha] || 0;
+    if (dayCount >= maxPorDia) continue;
+    const razonPrincipal = c.razones[0] || `${c.cuposRestantes} cupos disponibles`;
+    mejoresMomentos.push({
+      id: c.id,
+      fecha: c.fecha,
+      dia: c.dia,
+      horaInicio: c.horaInicio,
+      horaFin: c.horaFin,
+      cuposRestantes: c.cuposRestantes,
+      capacidadMaxima: c.capacidadMaxima,
+      afinidad: c.afinidad,
+      score: c.score,
+      ocupacionHistorica: c.ocupacionHistorica,
+      razon: razonPrincipal,
+      todasRazones: c.razones,
+      penalizaciones: c.penalizaciones,
     });
+    usedDays[c.fecha] = dayCount + 1;
+    if (mejoresMomentos.length >= limite) break;
+  }
 
   const slotKeysTop = new Set(mejoresMomentos.map((m) => `${m.dia}_${m.horaInicio}`));
 

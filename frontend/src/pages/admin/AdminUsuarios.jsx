@@ -12,7 +12,7 @@ import { ActionModal } from '../../components/ui/ActionModal'
 import { CardSkeleton } from '../../components/ui/SkeletonLoader'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { IconUsers, IconShieldAlert, IconAlertTriangle, IconChevronUp, IconChevronDown, IconChevronLeft, IconChevronRight, IconX, IconUserCheck, IconFileText, IconHistory } from '../../components/shared/Icons'
-import { AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion' // eslint-disable-line no-unused-vars
 
 const STATUS_BADGE = {
   suspendido: 'bg-danger-50 text-danger-700 border-danger-200',

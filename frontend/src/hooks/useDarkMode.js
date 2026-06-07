@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 
 const STORAGE_KEY = 'bookgym-theme'
 
@@ -7,12 +7,8 @@ function readInitial() {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored === 'dark' || stored === 'light') return stored
-  } catch {
-    // ignore (private mode, etc.)
-  }
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    return 'dark'
-  }
+  } catch { /* ignore */ }
+  if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark'
   return 'light'
 }
 
@@ -22,38 +18,35 @@ function apply(theme) {
   else root.classList.remove('dark')
 }
 
+let themeState = typeof window !== 'undefined' ? readInitial() : 'light'
+const listeners = new Set()
+
+function emitChange() {
+  for (const l of listeners) l()
+}
+
+function setTheme(newTheme) {
+  if (themeState === newTheme) return
+  themeState = newTheme
+  apply(newTheme)
+  try { localStorage.setItem(STORAGE_KEY, newTheme) } catch { /* ignore */ }
+  emitChange()
+}
+
+function subscribe(callback) {
+  listeners.add(callback)
+  return () => listeners.delete(callback)
+}
+
+function getSnapshot() {
+  return themeState
+}
+
 export function useDarkMode() {
-  const [theme, setTheme] = useState(readInitial)
+  const theme = useSyncExternalStore(subscribe, getSnapshot)
   const isDark = theme === 'dark'
 
-  useEffect(() => {
-    apply(theme)
-    try {
-      localStorage.setItem(STORAGE_KEY, theme)
-    } catch {
-      // ignore
-    }
-  }, [theme])
-
-  useEffect(() => {
-    if (!window.matchMedia) return
-    const mq = window.matchMedia('(prefers-color-scheme: dark)')
-    const onChange = (e) => {
-      try {
-        if (localStorage.getItem(STORAGE_KEY)) return
-      } catch {
-        // ignore
-      }
-      setTheme(e.matches ? 'dark' : 'light')
-    }
-    mq.addEventListener?.('change', onChange)
-    return () => mq.removeEventListener?.('change', onChange)
-  }, [])
-
-  const toggle = useCallback(() => {
-    setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
-  }, [])
-
+  const toggle = useCallback(() => setTheme(isDark ? 'light' : 'dark'), [isDark])
   const setLight = useCallback(() => setTheme('light'), [])
   const setDark = useCallback(() => setTheme('dark'), [])
 

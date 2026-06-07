@@ -163,7 +163,15 @@ export function MisCupos({ onNotice }) {
                 >
                   <div className="flex items-center justify-between">
                     <SaturacionBadge
-                      nivel={reserva.enVentanaCheckin ? 'baja' : 'media'}
+                      nivel={(() => {
+                        const disp = reserva.franja?.cuposDisponibles
+                        const cap = reserva.franja?.plantilla?.capacidadMaxima
+                        if (disp == null || cap == null || cap === 0) return 'media'
+                        const pct = ((cap - disp) / cap) * 100
+                        if (pct >= 75) return 'alta'
+                        if (pct >= 40) return 'media'
+                        return 'baja'
+                      })()}
                     />
                     <span className="text-xs font-medium text-slate-400">
                       {formatDate(reserva.franja?.fecha)}

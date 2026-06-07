@@ -8,7 +8,8 @@ import { SkeletonLoader } from '../../components/ui/SkeletonLoader'
 import { EmptyState } from '../../components/ui/EmptyState'
 import {
   IconSparkles, IconClock, IconShieldAlert, IconCalendarCheck,
-  IconChevronRight, IconAlertTriangle, IconX,
+  IconChevronRight, IconAlertTriangle, IconX, IconCheckCircle,
+  IconActivity, IconTrendingUp,
 } from '../../components/shared/Icons'
 import { formatDate, nowMillis, parseSlotMillis } from '../../utils/time'
 
@@ -48,6 +49,10 @@ export function HomeRecomendaciones({ onNotice }) {
     () => historial.filter((r) => String(r.estado).toLowerCase() === 'no_show'),
     [historial]
   )
+  const completadas = useMemo(
+    () => historial.filter((r) => String(r.estado).toLowerCase() === 'completada'),
+    [historial]
+  )
   const fallas = noShows.length
 
   const proximaReserva = useMemo(() => {
@@ -63,6 +68,8 @@ export function HomeRecomendaciones({ onNotice }) {
         return aInicio - bInicio
       })[0]
   }, [reservasActivas])
+
+  const perfil = recomendaciones?.perfilUsuario
 
   function pedirReserva(item) {
     setPendiente(item)
@@ -127,6 +134,30 @@ export function HomeRecomendaciones({ onNotice }) {
           Ver disponibilidad
           <IconChevronRight className="h-3.5 w-3.5" />
         </Link>
+      </div>
+
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-1.5">
+            <IconActivity className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[10px] font-medium text-slate-500">Activas</span>
+          </div>
+          <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{reservasActivas.length}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-1.5">
+            <IconCheckCircle className="h-3.5 w-3.5 text-success-500" />
+            <span className="text-[10px] font-medium text-slate-500">Asistidas</span>
+          </div>
+          <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{completadas.length}</p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-1.5">
+            <IconTrendingUp className="h-3.5 w-3.5 text-warning-500" />
+            <span className="text-[10px] font-medium text-slate-500">Racha</span>
+          </div>
+          <p className="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{perfil?.rachaAsistencia ?? 0}</p>
+        </div>
       </div>
 
       {fallas > 0 && (
